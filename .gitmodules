@@ -1,0 +1,3 @@
+[submodule "tooth_morphology"]
+	path = tooth_morphology
+	url = https://github.com/hx-w/tooth_morphology

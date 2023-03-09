@@ -1,0 +1,37 @@
+{
+    "ToothMorphology": {
+        "right_maxillary_central_incisor_outside": [
+            "n1_chenshun",
+            "n2_kongpingxiang",
+            "n3_kongqi",
+            "n4_lijuan",
+            "n5_yingaijun",
+            "n6_caoyingchun",
+            "n7_dengbangrong",
+            "n8_dengke",
+            "n9_heyuheng",
+            "n10_heyulin",
+            "n11_houhailong",
+            "n12_hulinglan",
+            "n13_huanglamei",
+            "n14_huangzhou",
+            "n15_jianghai",
+            "n16_jianglirong",
+            "n17_kangyixi",
+            "n18_limenglan",
+            "n19_liqingli",
+            "n20_liqunfang",
+            "n21_luoshuxi",
+            "n22_mingting",
+            "n23_penglihua",
+            "n24_qiaohongjin",
+            "n25_shenmin",
+            "n26_songfugao",
+            "n27_yangshengbin",
+            "n28_zhangguangying",
+            "n29_zhangyaopeng",
+            "n30_zhangzengxiang",
+            "n31_zhaojinfeng"
+        ]
+    }
+}
