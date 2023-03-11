@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <random>
 #include <string>
 #include <vector>
@@ -19,6 +20,99 @@
 #include "Utils.h"
 
 extern pangolin::GlSlProgram GetShaderProgram();
+
+Eigen::Vector3f cross(Eigen::Vector3f v1, Eigen::Vector3f v2) {
+    return Eigen::Vector3f(
+        v1[1] * v2[2] - v1[2] * v2[1],
+        v1[2] * v2[0] - v1[0] * v2[2],
+        v1[0] * v2[1] - v1[1] * v2[0]
+    );
+}
+
+void _split_words(const std::string& line, std::vector<std::string>& words, char delim) {
+    std::stringstream ss(line);
+    std::string word = "";
+    while (std::getline(ss, word, delim)) {
+        words.emplace_back(word);
+    }
+}
+
+void readObj(
+    std::string filename, std::vector<Eigen::Vector3f>& vertices, std::vector<Eigen::Vector3f>& normals
+) {
+    vertices.clear();
+    normals.clear();
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: cannot open file " << filename << std::endl;
+    }
+    std::vector<Eigen::Vector3i> faces;
+
+    std::string line;
+    std::clog << "Obj reader: " << filename.c_str() << std::endl;
+
+    try {
+        while (std::getline(file, line)) {
+            if (line.empty()) {
+                continue;
+            }
+            if (line[0] == '#') {
+                continue;
+            }
+            std::vector<std::string> words;
+            _split_words(line, words, ' ');
+
+            if (words[0] == "v") {
+                vertices.emplace_back(Eigen::Vector3f(stof(words[1]), stof(words[2]), stof(words[3])));
+            }
+            else if (words[0] == "f") {
+                faces.emplace_back(Eigen::Vector3i(
+                    stoi(words[1]) - 1, stoi(words[2]) - 1, stoi(words[3]) - 1
+                ));
+            }
+        }
+    }
+    catch (std::exception& e) {
+        std::clog << "load mesh err: " << e.what() << std::endl;
+    }
+    file.close();
+
+    std::vector<Eigen::Vector3f>(vertices.size(), Eigen::Vector3f(0.f, 0.f, 0.f)).swap(normals);
+    for (auto i = 0; i < faces.size(); ++i) {
+        auto& v0 = vertices[faces[i][0]];
+        auto& v1 = vertices[faces[i][1]];
+        auto& v2 = vertices[faces[i][2]];
+
+        auto _n = cross(v1 - v0, v2 - v0);
+        _n /= _n.norm();
+        normals[faces[i][0]] += _n;
+        normals[faces[i][1]] += _n;
+        normals[faces[i][2]] += _n;
+    }
+
+    // normalize
+    for (auto i = 0; i < normals.size(); ++i) {
+        normals[i] = normals[i] / normals[i].norm();
+    }
+} 
+
+void writePointCloudsToPLY(std::vector<Eigen::Vector3f>& xyz, std::string filename) {
+    std::ofstream plyFile;
+    plyFile.open(filename);
+    plyFile << "ply\n";
+    plyFile << "format ascii 1.0\n";
+    plyFile << "element vertex " << xyz.size() << "\n";
+    plyFile << "property float x\n";
+    plyFile << "property float y\n";
+    plyFile << "property float z\n";
+    plyFile << "end_header\n";
+
+    for (int i = 0; i < (int)xyz.size(); i++) {
+        Eigen::Vector3f v = xyz[i];
+        plyFile << v[0] << " " << v[1] << " " << v[2] << std::endl;
+    }
+    plyFile.close();
+}
 
 void SampleFromSurface(pangolin::Geometry& geom,
                        std::vector<Eigen::Vector3f>& surfpts,
@@ -460,89 +554,94 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Create Framebuffer with attached textures
-    size_t w = 400;
-    size_t h = 400;
-    pangolin::GlRenderBuffer zbuffer(w, h, GL_DEPTH_COMPONENT32);
-    pangolin::GlTexture normals(w, h, GL_RGBA32F);
-    pangolin::GlTexture vertices(w, h, GL_RGBA32F);
-    pangolin::GlFramebuffer framebuffer(vertices, normals, zbuffer);
+    // for (unsigned int v = 0; v < views.size(); v++) {
+    //     // change camera location
+    //     s_cam2.SetModelViewMatrix(pangolin::ModelViewLookAt(
+    //         views[v][0], views[v][1], views[v][2], 0, 0, 0, pangolin::AxisY));
+    //     // Draw the scene to the framebuffer
+    //     framebuffer.Bind();
+    //     glViewport(0, 0, w, h);
+    //     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // View points around a sphere.
-    std::vector<Eigen::Vector3f> views =
-        EquiDistPointsOnSphere(100, max_dist * 1.1);
+    //     prog.Bind();
+    //     prog.SetUniform("MVP", s_cam2.GetProjectionModelViewMatrix());
+    //     prog.SetUniform("V", s_cam2.GetModelViewMatrix());
+    //     prog.SetUniform("ToWorld", s_cam2.GetModelViewMatrix().Inverse());
+    //     prog.SetUniform("slant_thr", -1.0f, 1.0f);
+    //     prog.SetUniform("ttt", 1.0, 0, 0, 1);
+    //     pangolin::GlDraw(prog, gl_geom, nullptr);
+    //     prog.Unbind();
 
-    std::vector<Eigen::Vector4f> point_normals;
-    std::vector<Eigen::Vector4f> point_verts;
+    //     framebuffer.Unbind();
 
-    size_t num_tri = modelFaces.h;
-    std::vector<Eigen::Vector4f> tri_id_normal_test(num_tri);
-    for (size_t j = 0; j < num_tri; j++)
-        tri_id_normal_test[j] = Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
-    int total_obs = 0;
-    int wrong_obs = 0;
+    //     pangolin::TypedImage img_normals;
+    //     normals.Download(img_normals);
+    //     std::vector<Eigen::Vector4f> im_norms = ValidPointsAndTrisFromIm(
+    //         img_normals.UnsafeReinterpret<Eigen::Vector4f>(),
+    //         tri_id_normal_test, total_obs, wrong_obs);
+    //     point_normals.insert(point_normals.end(), im_norms.begin(),
+    //                          im_norms.end());
 
-    for (unsigned int v = 0; v < views.size(); v++) {
-        // change camera location
-        s_cam2.SetModelViewMatrix(pangolin::ModelViewLookAt(
-            views[v][0], views[v][1], views[v][2], 0, 0, 0, pangolin::AxisY));
-        // Draw the scene to the framebuffer
-        framebuffer.Bind();
-        glViewport(0, 0, w, h);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //     pangolin::TypedImage img_verts;
+    //     vertices.Download(img_verts);
+    //     std::vector<Eigen::Vector4f> im_verts =
+    //         ValidPointsFromIm(img_verts.UnsafeReinterpret<Eigen::Vector4f>());
+    //     point_verts.insert(point_verts.end(), im_verts.begin(), im_verts.end());
+    // }
 
-        prog.Bind();
-        prog.SetUniform("MVP", s_cam2.GetProjectionModelViewMatrix());
-        prog.SetUniform("V", s_cam2.GetModelViewMatrix());
-        prog.SetUniform("ToWorld", s_cam2.GetModelViewMatrix().Inverse());
-        prog.SetUniform("slant_thr", -1.0f, 1.0f);
-        prog.SetUniform("ttt", 1.0, 0, 0, 1);
-        pangolin::GlDraw(prog, gl_geom, nullptr);
-        prog.Unbind();
+    // int bad_tri = 0;
+    // for (unsigned int t = 0; t < tri_id_normal_test.size(); t++) {
+    //     if (tri_id_normal_test[t][3] < 0.0f)
+    //         bad_tri++;
+    // }
 
-        framebuffer.Unbind();
+    // std::cout << meshFileName << std::endl;
+    // std::cout << (float)(wrong_obs) / float(total_obs) << std::endl;
+    // std::cout << (float)(bad_tri) / float(num_tri) << std::endl;
 
-        pangolin::TypedImage img_normals;
-        normals.Download(img_normals);
-        std::vector<Eigen::Vector4f> im_norms = ValidPointsAndTrisFromIm(
-            img_normals.UnsafeReinterpret<Eigen::Vector4f>(),
-            tri_id_normal_test, total_obs, wrong_obs);
-        point_normals.insert(point_normals.end(), im_norms.begin(),
-                             im_norms.end());
+    // float wrong_ratio = (float)(wrong_obs) / float(total_obs);
+    // float bad_tri_ratio = (float)(bad_tri) / float(num_tri);
 
-        pangolin::TypedImage img_verts;
-        vertices.Download(img_verts);
-        std::vector<Eigen::Vector4f> im_verts =
-            ValidPointsFromIm(img_verts.UnsafeReinterpret<Eigen::Vector4f>());
-        point_verts.insert(point_verts.end(), im_verts.begin(), im_verts.end());
-    }
-
-    int bad_tri = 0;
-    for (unsigned int t = 0; t < tri_id_normal_test.size(); t++) {
-        if (tri_id_normal_test[t][3] < 0.0f)
-            bad_tri++;
-    }
-
-    std::cout << meshFileName << std::endl;
-    std::cout << (float)(wrong_obs) / float(total_obs) << std::endl;
-    std::cout << (float)(bad_tri) / float(num_tri) << std::endl;
-
-    float wrong_ratio = (float)(wrong_obs) / float(total_obs);
-    float bad_tri_ratio = (float)(bad_tri) / float(num_tri);
-
-    if (wrong_ratio > rejection_criteria_obs ||
-        bad_tri_ratio > rejection_criteria_tri) {
-        std::cout << "mesh rejected" << std::endl;
-        //    return 0;
-    }
+    // if (wrong_ratio > rejection_criteria_obs ||
+    //     bad_tri_ratio > rejection_criteria_tri) {
+    //     std::cout << "mesh rejected" << std::endl;
+    //     //    return 0;
+    // }
 
     std::vector<Eigen::Vector3f> vertices2;
     //    std::vector<Eigen::Vector3f> vertices_all;
     std::vector<Eigen::Vector3f> normals2;
 
-    for (unsigned int v = 0; v < point_verts.size(); v++) {
-        vertices2.push_back(point_verts[v].head<3>());
-        normals2.push_back(point_normals[v].head<3>());
+    if (meshFileName.find(".obj") != std::string::npos) {
+        readObj(meshFileName, vertices2, normals2);
+    }
+    else {
+        // Create Framebuffer with attached textures
+        size_t w = 400;
+        size_t h = 400;
+        pangolin::GlRenderBuffer zbuffer(w, h, GL_DEPTH_COMPONENT32);
+        pangolin::GlTexture normals(w, h, GL_RGBA32F);
+        pangolin::GlTexture vertices(w, h, GL_RGBA32F);
+        pangolin::GlFramebuffer framebuffer(vertices, normals, zbuffer);
+
+        // View points around a sphere.
+        std::vector<Eigen::Vector3f> views =
+            EquiDistPointsOnSphere(100, max_dist * 1.1);
+
+        std::vector<Eigen::Vector4f> point_normals;
+        std::vector<Eigen::Vector4f> point_verts;
+
+        size_t num_tri = modelFaces.h;
+        std::vector<Eigen::Vector4f> tri_id_normal_test(num_tri);
+        for (size_t j = 0; j < num_tri; j++)
+            tri_id_normal_test[j] = Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+        int total_obs = 0;
+        int wrong_obs = 0;
+
+        for (unsigned int v = 0; v < point_verts.size(); v++) {
+            vertices2.push_back(point_verts[v].head<3>());
+            normals2.push_back(point_normals[v].head<3>());
+        }
     }
 
     KdVertexList kdVerts(vertices2);
@@ -559,13 +658,13 @@ int main(int argc, char** argv) {
     auto start = std::chrono::high_resolution_clock::now();
     SampleSDFNearSurface(kdTree_surf, vertices2, xyz_surf, normals2, xyz, sdf,
                          num_sample - num_samp_near_surf, variance,
-                         second_variance, 2, 11);
+                         second_variance, 20, 11);
 
     auto finish = std::chrono::high_resolution_clock::now();
     auto elapsed =
         std::chrono::duration_cast<std::chrono::seconds>(finish - start)
             .count();
-    std::cout << elapsed << std::endl;
+    std::cout << "elapsed: " << elapsed << std::endl;
 
     if (save_ply) {
         writeSDFToPLY(xyz, sdf, plyFileNameOut, false, true);
