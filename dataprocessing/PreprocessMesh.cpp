@@ -282,6 +282,7 @@ void writeSDFToPLY(
 int main(int argc, char** argv) {
   std::string meshFileName;
   bool vis = false;
+  bool unify = false;
 
   std::string npyFileName;
   std::string plyFileNameOut;
@@ -304,6 +305,7 @@ int main(int argc, char** argv) {
   app.add_flag("--sply", save_ply, "save ply point cloud for visualization");
   app.add_flag("-t", test_flag, "test_flag");
   app.add_option("-n", spatial_samples_npz, "spatial samples from file");
+  app.add_flag("-u", unify, "unify mesh");
 
   CLI11_PARSE(app, argc, argv);
 
@@ -382,7 +384,8 @@ int main(int argc, char** argv) {
       geom.objects.begin()->second.attributes["vertex_indices"]);
 
   // preserve origin status
-  float max_dist = BoundingCubeNormalization(geom, true);
+  std::cout << "unify: " << unify << std::endl;
+  float max_dist = BoundingCubeNormalization(geom, !unify);
 
   if (vis)
     pangolin::CreateWindowAndBind("Main", 640, 480);

@@ -205,7 +205,7 @@ def convert_sdf_samples_to_ply(
         raise NotImplementedError
 
     verts, faces, normals, values = skimage.measure.marching_cubes(
-        numpy_3d_sdf_tensor, level=None, spacing=[voxel_size] * 3
+        numpy_3d_sdf_tensor, level=0, spacing=[voxel_size] * 3
     )
 
     # transform from voxel coordinates to camera coordinates

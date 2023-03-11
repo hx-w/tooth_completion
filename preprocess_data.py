@@ -141,6 +141,14 @@ if __name__ == "__main__":
         help="If set, the script will produce mesh surface samples for evaluation. "
         + "Otherwise, the script will produce SDF samples for training.",
     )
+    arg_parser.add_argument(
+        "--unify",
+        "-u",
+        dest="unify",
+        default=False,
+        action="store_true",
+        help="If set, the script will unify the meshes in the source directory.",
+    )
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -162,6 +170,8 @@ if __name__ == "__main__":
 
         if args.test_sampling:
             additional_general_args += ["-t"]
+        if args.unify:
+            additional_general_args += ["-u"]
 
     with open(args.split_filename, "r") as f:
         split = json.load(f)

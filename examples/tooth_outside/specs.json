@@ -37,7 +37,7 @@
         }
     },
     "CodeLength": 256,
-    "NumEpochs": 20001,
+    "NumEpochs": 3001,
     "SnapshotFrequency": 1000,
     "AdditionalSnapshots": [
         100,
