@@ -141,10 +141,10 @@ void main(){
 )Shader";
 
 pangolin::GlSlProgram GetShaderProgram() {
-  pangolin::GlSlProgram program;
+    pangolin::GlSlProgram program;
 
-  program.AddShader(pangolin::GlSlAnnotatedShader, shaderText);
-  program.Link();
+    program.AddShader(pangolin::GlSlAnnotatedShader, shaderText);
+    program.Link();
 
-  return program;
+    return program;
 }

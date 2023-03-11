@@ -8,6 +8,6 @@ python3 preprocess_data.py \
     --data_dir data \
     --source tooth_morphology/datasets \
     --name ToothMorphology \
-    --split examples/splits/tooth_${1}_train.json 
+    --split examples/splits/tooth_${1}_${2}.json 
     # -u
     # --skip \

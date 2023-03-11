@@ -1,3 +1,6 @@
 [submodule "tooth_morphology"]
 	path = tooth_morphology
 	url = https://github.com/hx-w/tooth_morphology
+[submodule "cnpy"]
+	path = cnpy
+	url = https://github.com/rogersce/cnpy.git
