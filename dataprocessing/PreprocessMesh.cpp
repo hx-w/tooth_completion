@@ -56,7 +56,10 @@ void writePointCloudsToPLY(std::vector<Eigen::Vector3f>& xyz, std::string filena
 }
 
 void readObj(
-    std::string filename, std::vector<Eigen::Vector3f>& vertices, std::vector<Eigen::Vector3f>& normals
+    std::string filename,
+    std::vector<Eigen::Vector3f>& vertices,
+    std::vector<Eigen::Vector3f>& normals,
+    bool unify_center
 ) {
     vertices.clear();
     normals.clear();
@@ -69,6 +72,8 @@ void readObj(
     std::string line;
     std::clog << "Obj reader: " << filename.c_str() << std::endl;
 
+    float xMin = 1000000, xMax = -1000000, yMin = 1000000, yMax = -1000000,
+          zMin = 1000000, zMax = -1000000;
     try {
         while (std::getline(file, line)) {
             if (line.empty()) {
@@ -81,7 +86,16 @@ void readObj(
             _split_words(line, words, ' ');
 
             if (words[0] == "v") {
-                vertices.emplace_back(Eigen::Vector3f(stof(words[1]), stof(words[2]), stof(words[3])));
+                auto _v = Eigen::Vector3f(stof(words[1]), stof(words[2]), stof(words[3]));
+                vertices.emplace_back(_v);
+
+                xMin = fmin(xMin, _v[0]);
+                yMin = fmin(yMin, _v[1]);
+                zMin = fmin(zMin, _v[2]);
+                xMax = fmax(xMax, _v[0]);
+                yMax = fmax(yMax, _v[1]);
+                zMax = fmax(zMax, _v[2]);
+
             }
             else if (words[0] == "f") {
                 faces.emplace_back(Eigen::Vector3i(
@@ -94,6 +108,18 @@ void readObj(
         std::clog << "load mesh err: " << e.what() << std::endl;
     }
     file.close();
+
+    if (unify_center) {
+        const float xCenter = (xMax + xMin) / 2.0f;
+        const float yCenter = (yMax + yMin) / 2.0f;
+        const float zCenter = (zMax + zMin) / 2.0f;
+
+        for (auto i = 0; i < vertices.size(); ++i) {
+            vertices[i][0] -= xCenter;
+            vertices[i][1] -= yCenter;
+            vertices[i][2] -= zCenter;
+        }
+    }
 
     std::vector<Eigen::Vector3f>(vertices.size(), Eigen::Vector3f(0.f, 0.f, 0.f)).swap(normals);
     for (auto i = 0; i < faces.size(); ++i) {
@@ -387,7 +413,8 @@ void writeSDFToPLY(std::vector<Eigen::Vector3f>& xyz,
 int main(int argc, char** argv) {
     std::string meshFileName;
     bool vis = false;
-    bool unify = false;
+    bool unify_center = false;
+    bool unify_scale = false;
 
     std::string npyFileName;
     std::string plyFileNameOut;
@@ -411,7 +438,8 @@ int main(int argc, char** argv) {
     app.add_flag("--sply", save_ply, "save ply point cloud for visualization");
     app.add_flag("-t", test_flag, "test_flag");
     app.add_option("-n", spatial_samples_npz, "spatial samples from file");
-    app.add_flag("-u", unify, "unify mesh");
+    app.add_flag("--uc", unify_center, "unify mesh");
+    app.add_flag("--us", unify_scale, "unify mesh");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -500,8 +528,8 @@ int main(int argc, char** argv) {
             geom.objects.begin()->second.attributes["vertex_indices"]);
 
     // preserve origin status
-    std::cout << "unify: " << unify << std::endl;
-    float max_dist = BoundingCubeNormalization(geom, !unify);
+    std::cout << "unify_center: " << unify_center << "  unify_scale: " << unify_scale << std::endl;
+    float max_dist = BoundingCubeNormalization(geom, unify_center, unify_scale);
 
     if (vis)
         pangolin::CreateWindowAndBind("Main", 640, 480);
@@ -567,7 +595,7 @@ int main(int argc, char** argv) {
     std::vector<Eigen::Vector3f> normals2;
 
     if (meshFileName.find(".obj") != std::string::npos) {
-        readObj(meshFileName, vertices2, normals2);
+        readObj(meshFileName, vertices2, normals2, unify_center);
     }
     else {
         // Create Framebuffer with attached textures
@@ -621,9 +649,9 @@ int main(int argc, char** argv) {
     std::cout << "elapsed: " << elapsed << std::endl;
 
     if (save_ply) {
-        writeSDFToPLY(xyz, sdf, plyFileNameOut, false, true);
-        // writeSDFToPLY(xyz, sdf, "neg.ply", true, false);
-        // writeSDFToPLY(xyz, sdf, "pos.ply", false, true);
+        // writeSDFToPLY(xyz, sdf, plyFileNameOut, false, true);
+        writeSDFToPLY(xyz, sdf, "neg.ply", true, false);
+        writeSDFToPLY(xyz, sdf, "pos.ply", false, true);
     }
 
     std::cout << "num points sampled: " << xyz.size() << std::endl;

@@ -56,6 +56,19 @@ def code_to_mesh(experiment_directory, checkpoint):
     scale = None
 
     with torch.no_grad():
+        deep_sdf.mesh.create_slice_heatmap(
+            decoder.forward_template,
+            None,
+            mesh_filename + "_XOZ.png",
+            24, 1080, None, -1.5, None
+        )
+        deep_sdf.mesh.create_slice_heatmap(
+            decoder.forward_template,
+            None,
+            mesh_filename + "_YOZ.png",
+            24, 1080, 0, None, None
+        )
+
         deep_sdf.mesh.create_mesh(
             decoder.forward_template,
             None,
@@ -64,7 +77,7 @@ def code_to_mesh(experiment_directory, checkpoint):
             max_batch=int(2 ** 20),
             offset=offset,
             scale=scale,
-            volume_size=2.0
+            volume_size=20.0
         )
 
 

@@ -67,5 +67,6 @@ std::pair<Eigen::Vector3f, float> ComputeNormalizationParameters(
     const float buffer = 1.03);
 
 float BoundingCubeNormalization(pangolin::Geometry& geom,
-                                const bool nochange = true,
+                                const bool unify_center = true,
+                                const bool unify_scale = false,
                                 const float buffer = 1.03);

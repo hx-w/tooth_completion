@@ -142,9 +142,15 @@ if __name__ == "__main__":
         + "Otherwise, the script will produce SDF samples for training.",
     )
     arg_parser.add_argument(
-        "--unify",
-        "-u",
-        dest="unify",
+        "--unify_center",
+        dest="unify_center",
+        default=False,
+        action="store_true",
+        help="If set, the script will unify the meshes in the source directory.",
+    )
+    arg_parser.add_argument(
+        "--unify_scale",
+        dest="unify_scale",
         default=False,
         action="store_true",
         help="If set, the script will unify the meshes in the source directory.",
@@ -170,8 +176,10 @@ if __name__ == "__main__":
 
         if args.test_sampling:
             additional_general_args += ["-t"]
-        if args.unify:
-            additional_general_args += ["-u"]
+        if args.unify_center:
+            additional_general_args += ["--uc"]
+        if args.unify_scale:
+            additional_general_args += ["--us"]
 
     with open(args.split_filename, "r") as f:
         split = json.load(f)

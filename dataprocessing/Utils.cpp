@@ -175,7 +175,8 @@ std::pair<Eigen::Vector3f, float> ComputeNormalizationParameters(
 }
 
 float BoundingCubeNormalization(pangolin::Geometry& geom,
-                                bool nochange,
+                                bool unify_center,
+                                bool unify_scale,
                                 const float buffer) {
     float xMin = 1000000, xMax = -1000000, yMin = 1000000, yMax = -1000000,
           zMin = 1000000, zMax = -1000000;
@@ -227,7 +228,7 @@ float BoundingCubeNormalization(pangolin::Geometry& geom,
         if (verticesUsed[i] == false)
             continue;
 
-        if (!nochange) {
+        if (unify_center) {
             vertices(0, i) -= xCenter;
             vertices(1, i) -= yCenter;
             vertices(2, i) -= zCenter;
@@ -241,7 +242,7 @@ float BoundingCubeNormalization(pangolin::Geometry& geom,
     // add some buffer
     maxDistance *= buffer;
 
-    if (!nochange) {
+    if (unify_scale) {
         for (size_t i = 0; i < numVertices; i++) {
             vertices(0, i) /= maxDistance;
             vertices(1, i) /= maxDistance;

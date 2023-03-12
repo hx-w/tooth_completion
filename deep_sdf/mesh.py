@@ -7,8 +7,41 @@ import plyfile
 import skimage.measure
 import time
 import torch
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import deep_sdf.utils
+
+
+def create_slice_heatmap(
+    decoder, latent_vec, filename, volume_size, img_size, x_axis, y_axis, z_axis
+):
+    sample_pnts = None
+    if x_axis is not None:
+        sample_pnts = torch.Tensor([
+            (x_axis, (x / img_size) * volume_size - volume_size / 2, (z / img_size) * volume_size - volume_size / 2)
+            for x in range(img_size) for z in range(img_size)
+        ]).cuda()
+    elif y_axis is not None:
+        sample_pnts = torch.Tensor([
+            ((x / img_size) * volume_size - volume_size / 2, y_axis, (z / img_size) * volume_size - volume_size / 2)
+            for x in range(img_size) for z in range(img_size)
+        ]).cuda()
+    else:
+        sample_pnts = torch.Tensor([
+            ((x / img_size) * volume_size - volume_size / 2, (z / img_size) * volume_size - volume_size / 2, z_axis)
+            for x in range(img_size) for z in range(img_size)
+        ]).cuda()
+
+    sdfs = (
+        deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_pnts)
+        .squeeze(1).detach().cpu().numpy().reshape((img_size, img_size))
+    )
+
+    style = 'YlGnBu_r'
+    plt.figure(figsize = (50, 50))
+    htmap = sns.heatmap(sdfs, cmap=style, cbar=False, xticklabels=False, yticklabels=False)
+    htmap.get_figure().savefig(filename)
 
 
 def create_mesh(
@@ -67,7 +100,6 @@ def create_mesh(
         offset,
         scale,
     )
-
 
 def create_mesh_octree(
         decoder, latent_vec, filename, N=256, max_batch=32 ** 3, offset=None, scale=None, clamp_func=None,
