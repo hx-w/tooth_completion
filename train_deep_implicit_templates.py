@@ -369,8 +369,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                 xyz_ = xyz[i].cuda()
 
                 # NN optimization
-                warped_xyz_list, pred_sdf_list, _ = decoder(
-                    input, output_warped_points=True, output_warping_param=True)
+                warped_xyz_list, pred_sdf_list = decoder(
+                    input, output_warped_points=True)
 
                 if enforce_minmax:
                     # pred_sdf = pred_sdf * clamp_dist * 1.0
@@ -413,10 +413,10 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             # logging.debug("sdf_loss = {:.9f}, reg_loss = {:.9f}, pw_loss = {:.9f}, pp_loss = {:.9f}".format(
             #     batch_loss_sdf, batch_loss_reg, batch_loss_pw, batch_loss_pp))
 
-            ws.save_tensorboard_logs(
-                tensorboard_saver, epoch*batch_num + bi,
-                loss_sdf=batch_loss_sdf, loss_pw=batch_loss_pw, loss_reg=batch_loss_reg,
-                loss_pp=batch_loss_pp, loss_=batch_loss)
+            # ws.save_tensorboard_logs(
+            #     tensorboard_saver, epoch*batch_num + bi,
+            #     loss_sdf=batch_loss_sdf, loss_pw=batch_loss_pw, loss_reg=batch_loss_reg,
+            #     loss_pp=batch_loss_pp, loss_=batch_loss)
 
             if epoch % 20 == 0:
                 logging.debug('batch_loss = {:.9f}'.format(batch_loss))

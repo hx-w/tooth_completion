@@ -60,7 +60,7 @@ def code_to_mesh(experiment_directory, checkpoint):
             decoder.forward_template,
             None,
             mesh_filename + "_XOZ.png",
-            24, 1080, None, -1.5, None
+            24, 1080, None, 0, None
         )
         deep_sdf.mesh.create_slice_heatmap(
             decoder.forward_template,

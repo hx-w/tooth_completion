@@ -48,7 +48,6 @@ def reconstruct(
     loss_l1 = torch.nn.L1Loss()
 
     for e in range(num_iterations):
-
         decoder.eval()
         sdf_data = deep_sdf.data.unpack_sdf_samples_from_ram(
             test_sdf, num_samples
@@ -76,14 +75,14 @@ def reconstruct(
 
         loss = loss_l1(pred_sdf, sdf_gt)
         if l2reg:
-            loss += 1e-4 * torch.mean(latent.pow(2))
+            loss += 1e-3 * torch.mean(latent.pow(2))
         loss.backward()
         optimizer.step()
 
-        if e % 50 == 0:
-            logging.debug(loss.item())
-            logging.debug(e)
-            logging.debug(latent.norm())
+        if e % 1000 == 0:
+            logging.info(loss.item())
+            logging.info(e)
+            logging.info(latent.norm())
         loss_num = loss.item()
 
     return loss_num, latent
@@ -333,6 +332,19 @@ if __name__ == "__main__":
                         deep_sdf.mesh.create_mesh(
                             decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 17), volume_size=20
                         )
+
+                    deep_sdf.mesh.create_slice_heatmap(
+                        decoder,
+                        latent,
+                        mesh_filename + "_XOZ.png",
+                        24, 1080, None, -1.5, None
+                    )
+                    deep_sdf.mesh.create_slice_heatmap(
+                        decoder,
+                        latent,
+                        mesh_filename + "_YOZ.png",
+                        24, 1080, 0, None, None
+                    )
                 logging.debug("total time: {}".format(time.time() - start))
 
             if not os.path.exists(os.path.dirname(latent_filename)):

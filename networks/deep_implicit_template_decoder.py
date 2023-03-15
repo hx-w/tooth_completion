@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+from .modules import BatchLinear, Sine, FCBlock
 
 class SdfDecoder(nn.Module):
     def __init__(
@@ -125,6 +126,42 @@ def init_out_weights(self):
             elif 'bias' in name:
                 nn.init.constant_(param.data, 0)
 
+class SineWarper(nn.Module):
+    def __init__(self, latent_size, hidden_size, steps):
+        super(SineWarper, self).__init__()
+        self.n_feature_channels = latent_size + 3
+        self.steps = steps
+        self.hidden_size = hidden_size
+        self.sine = FCBlock(
+            in_features=self.n_feature_channels,
+            hidden_features=self.hidden_size,
+            out_features=6,
+            nonlinearity='sine',
+            num_hidden_layers=1,
+            # outermost_linear=True
+        )
+        # self.sine.apply(init_out_weights)
+    
+    def forward(self, input, step=1.0):
+        if step < 1.0:
+            input_bk = input.clone().detach()
+
+        xyz = input[:, -3:]
+        code = input[:, :-3]
+
+        a = self.sine(torch.cat([code, xyz], dim=1))
+
+        tmp_xyz = torch.addcmul(a[:, 3:], (1 + a[:, :3]), xyz)
+
+        warped_xyzs = [tmp_xyz]
+        xyz = tmp_xyz
+
+        if step < 1.0:
+            xyz_ = input_bk[:, -3:]
+            xyz = xyz * step + xyz_ * (1 - step)
+
+        return xyz, warped_xyzs
+
 
 class Warper(nn.Module):
     def __init__(
@@ -152,7 +189,6 @@ class Warper(nn.Module):
         xyz = input[:, -3:]
         code = input[:, :-3]
         states = [None]
-        warping_param = []
 
         warped_xyzs = []
         for s in range(self.steps):
@@ -162,7 +198,6 @@ class Warper(nn.Module):
             a = self.out_layer_coord_affine(state[0])
             tmp_xyz = torch.addcmul(a[:, 3:], (1 + a[:, :3]), xyz)
 
-            warping_param.append(a)
             states.append(state)
             if (s+1) % (self.steps // 4) == 0:
                 warped_xyzs.append(tmp_xyz)
@@ -172,45 +207,33 @@ class Warper(nn.Module):
             xyz_ = input_bk[:, -3:]
             xyz = xyz * step + xyz_ * (1 - step)
 
-        return xyz, warping_param, warped_xyzs
+        return xyz, warped_xyzs
 
 
 class Decoder(nn.Module):
     def __init__(self, latent_size, warper_kargs, decoder_kargs):
         super(Decoder, self).__init__()
-        self.warper = Warper(latent_size, **warper_kargs)
+        # self.warper = Warper(latent_size, **warper_kargs)
+        self.warper = SineWarper(latent_size, **warper_kargs)
         self.sdf_decoder = SdfDecoder(**decoder_kargs)
 
-    def forward(self, input, output_warped_points=False, output_warping_param=False,
-                step=1.0):
-        p_final, warping_param, warped_xyzs = self.warper(input, step=step)
+    def forward(self, input, output_warped_points=False, step=1.0):
+        p_final, warped_xyzs = self.warper(input, step=step)
 
         if not self.training:
             x = self.sdf_decoder(p_final)
             if output_warped_points:
-                if output_warping_param:
-                    return p_final, x, warping_param
-                else:
-                    return p_final, x
+                return p_final, x
             else:
-                if output_warping_param:
-                    return x, warping_param
-                else:
-                    return x
+                return x
         else:   # training mode, output intermediate positions and their corresponding sdf prediction
             xs = []
             for p in warped_xyzs:
                 xs.append(self.sdf_decoder(p))
             if output_warped_points:
-                if output_warping_param:
-                    return warped_xyzs, xs, warping_param
-                else:
-                    return warped_xyzs, xs
+                return warped_xyzs, xs
             else:
-                if output_warping_param:
-                    return xs, warping_param
-                else:
-                    return xs
+                return xs
 
     def forward_template(self, input):
         return self.sdf_decoder(input)

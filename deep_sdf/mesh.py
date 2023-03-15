@@ -38,7 +38,7 @@ def create_slice_heatmap(
         .squeeze(1).detach().cpu().numpy().reshape((img_size, img_size))
     )
 
-    style = 'YlGnBu_r'
+    style = 'coolwarm'
     plt.figure(figsize = (50, 50))
     htmap = sns.heatmap(sdfs, cmap=style, cbar=False, xticklabels=False, yticklabels=False)
     htmap.get_figure().savefig(filename)
