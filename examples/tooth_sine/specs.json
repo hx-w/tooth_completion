@@ -7,13 +7,13 @@
     "NetworkSpecs": {
         "warper_kargs": {
             "hidden_size": 256,
-            "steps": 1
+            "steps": 8
         },
         "decoder_kargs": {
             "dims": [
                 256,
                 256,
-                128,
+                256,
                 256,
                 256
             ],
@@ -63,8 +63,8 @@
             "Factor": 0.5
         }
     ],
-    "SamplesPerScene": 5000,
-    "ScenesPerBatch": 12,
+    "SamplesPerScene": 10000,
+    "ScenesPerBatch": 14,
     "DataLoaderThreads": 0,
     "ClampingDistance": 0.1,
     "CodeRegularization": true,
@@ -74,5 +74,6 @@
     "PointwiseLossWeight": 0.005,
     "UsePointpairLoss": true,
     "PointpairLossWeight": 0.0001,
-    "UseCurriculum": false
+    "UseCurriculum": true,
+    "GradientClipNorm": 1.0
 }

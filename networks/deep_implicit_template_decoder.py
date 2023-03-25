@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
-from .modules import BatchLinear, Sine, FCBlock
+from .modules import SingleBVPNet
 
 class SdfDecoder(nn.Module):
     def __init__(
@@ -126,49 +126,13 @@ def init_out_weights(self):
             elif 'bias' in name:
                 nn.init.constant_(param.data, 0)
 
-class SineWarper(nn.Module):
-    def __init__(self, latent_size, hidden_size, steps):
-        super(SineWarper, self).__init__()
-        self.n_feature_channels = latent_size + 3
-        self.steps = steps
-        self.hidden_size = hidden_size
-        self.sine = FCBlock(
-            in_features=self.n_feature_channels,
-            hidden_features=self.hidden_size,
-            out_features=6,
-            nonlinearity='sine',
-            num_hidden_layers=1,
-            # outermost_linear=True
-        )
-        # self.sine.apply(init_out_weights)
-    
-    def forward(self, input, step=1.0):
-        if step < 1.0:
-            input_bk = input.clone().detach()
-
-        xyz = input[:, -3:]
-        code = input[:, :-3]
-
-        a = self.sine(torch.cat([code, xyz], dim=1))
-
-        tmp_xyz = torch.addcmul(a[:, 3:], (1 + a[:, :3]), xyz)
-
-        warped_xyzs = [tmp_xyz]
-        xyz = tmp_xyz
-
-        if step < 1.0:
-            xyz_ = input_bk[:, -3:]
-            xyz = xyz * step + xyz_ * (1 - step)
-
-        return xyz, warped_xyzs
-
 
 class Warper(nn.Module):
     def __init__(
-            self,
-            latent_size,
-            hidden_size,
-            steps,
+        self,
+        latent_size,
+        hidden_size,
+        steps,
     ):
         super(Warper, self).__init__()
         self.n_feature_channels = latent_size + 3
@@ -213,14 +177,15 @@ class Warper(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, latent_size, warper_kargs, decoder_kargs):
         super(Decoder, self).__init__()
-        # self.warper = Warper(latent_size, **warper_kargs)
-        self.warper = SineWarper(latent_size, **warper_kargs)
+        self.warper = Warper(latent_size, **warper_kargs)
         self.sdf_decoder = SdfDecoder(**decoder_kargs)
+        # self.sdf_decoder = SingleBVPNet(type='sine', in_features=3)
 
     def forward(self, input, output_warped_points=False, step=1.0):
         p_final, warped_xyzs = self.warper(input, step=step)
 
         if not self.training:
+            # x = self.sdf_decoder({'coords': p_final})['model_out']
             x = self.sdf_decoder(p_final)
             if output_warped_points:
                 return p_final, x
@@ -229,6 +194,7 @@ class Decoder(nn.Module):
         else:   # training mode, output intermediate positions and their corresponding sdf prediction
             xs = []
             for p in warped_xyzs:
+                # xs.append(self.sdf_decoder({'coords': p})['model_out'])
                 xs.append(self.sdf_decoder(p))
             if output_warped_points:
                 return warped_xyzs, xs
@@ -236,4 +202,5 @@ class Decoder(nn.Module):
                 return xs
 
     def forward_template(self, input):
+        # return self.sdf_decoder({'coords': input})['model_out']
         return self.sdf_decoder(input)

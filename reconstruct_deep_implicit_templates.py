@@ -337,13 +337,13 @@ if __name__ == "__main__":
                         decoder,
                         latent,
                         mesh_filename + "_XOZ.png",
-                        24, 1080, None, -1.5, None
+                        24, 500, None, -1.5, None
                     )
                     deep_sdf.mesh.create_slice_heatmap(
                         decoder,
                         latent,
                         mesh_filename + "_YOZ.png",
-                        24, 1080, 0, None, None
+                        24, 500, 0, None, None
                     )
                 logging.debug("total time: {}".format(time.time() - start))
 

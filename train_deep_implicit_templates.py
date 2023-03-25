@@ -82,6 +82,11 @@ def apply_pointpair_reg(warped_xyz_list, xyz_, loss_lp, scene_per_split, num_sdf
     # ) / num_sdf_samples
     return lp_loss
 
+def gradient(y, x, grad_outputs=None):
+    if grad_outputs is None:
+        grad_outputs = torch.ones_like(y)
+    grad = torch.autograd.grad(y, [x], grad_outputs=grad_outputs, create_graph=True)[0]
+    return grad
 
 def main_function(experiment_directory, data_source, continue_from, batch_split):
 
@@ -399,6 +404,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                     batch_loss_pw += pw_loss.item()
                     chunk_loss = chunk_loss + pw_loss.cuda() * pointwise_loss_weight * max(1.0, 10.0 * (1 - epoch / 100))
 
+                    del pw_loss
+
                 if use_pointpair_loss:
                     if use_curriculum:
                         lp_loss = apply_pointpair_reg(warped_xyz_list, xyz_, loss_lp, scene_per_split, num_sdf_samples)
@@ -407,16 +414,10 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                     batch_loss_pp += lp_loss.item()
                     chunk_loss += lp_loss.cuda() * pointpair_loss_weight * min(1.0, epoch / 100)
 
+                    del lp_loss
+
                 chunk_loss.backward()
                 batch_loss += chunk_loss.item()
-
-            # logging.debug("sdf_loss = {:.9f}, reg_loss = {:.9f}, pw_loss = {:.9f}, pp_loss = {:.9f}".format(
-            #     batch_loss_sdf, batch_loss_reg, batch_loss_pw, batch_loss_pp))
-
-            # ws.save_tensorboard_logs(
-            #     tensorboard_saver, epoch*batch_num + bi,
-            #     loss_sdf=batch_loss_sdf, loss_pw=batch_loss_pw, loss_reg=batch_loss_reg,
-            #     loss_pp=batch_loss_pp, loss_=batch_loss)
 
             if epoch % 20 == 0:
                 logging.debug('batch_loss = {:.9f}'.format(batch_loss))
@@ -430,8 +431,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             optimizer_all.step()
 
             # release memory
-            del warped_xyz_list, pred_sdf_list, sdf_loss, pw_loss, \
-                lp_loss, batch_loss_sdf, batch_loss_reg, batch_loss_pp, batch_loss_pw, batch_loss, chunk_loss
+            del warped_xyz_list, pred_sdf_list, sdf_loss, \
+                batch_loss_sdf, batch_loss_reg, batch_loss_pp, batch_loss_pw, batch_loss, chunk_loss
 
         end = time.time()
 
