@@ -12,9 +12,9 @@
         "decoder_kargs": {
             "dims": [
                 256,
-                512,
-                512,
-                512,
+                256,
+                256,
+                256,
                 256
             ],
             "dropout": [
@@ -63,8 +63,8 @@
             "Factor": 0.5
         }
     ],
-    "SamplesPerScene": 5000,
-    "ScenesPerBatch": 8,
+    "SamplesPerScene": 10000,
+    "ScenesPerBatch": 12,
     "DataLoaderThreads": 0,
     "ClampingDistance": 0.1,
     "CodeRegularization": true,

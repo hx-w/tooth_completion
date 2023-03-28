@@ -64,20 +64,23 @@ class FCBlock(MetaModule):
 
         self.net = []
         self.net.append(MetaSequential(
-            BatchLinear(in_features, hidden_features), nl
+            nn.utils.weight_norm(nn.Linear(in_features, hidden_features)), nl
         ))
+        # self.net.append(nn.ReLU())
 
         for i in range(num_hidden_layers):
             self.net.append(MetaSequential(
-                BatchLinear(hidden_features, hidden_features), nl
+                nn.utils.weight_norm(nn.Linear(hidden_features, hidden_features)), nl
             ))
+            # self.net.append(nn.ReLU())
 
         if outermost_linear:
-            self.net.append(MetaSequential(BatchLinear(hidden_features, out_features)))
+            self.net.append(MetaSequential(nn.Linear(hidden_features, out_features)))
         else:
             self.net.append(MetaSequential(
-                BatchLinear(hidden_features, out_features), nl
+                nn.utils.weight_norm(nn.Linear(hidden_features, out_features)), nl
             ))
+        self.net.append(nn.Tanh())
 
         self.net = MetaSequential(*self.net)
         if self.weight_init is not None:
@@ -91,6 +94,7 @@ class FCBlock(MetaModule):
             params = OrderedDict(self.named_parameters())
 
         output = self.net(coords, params=get_subdict(params, 'net'))
+        
         return output
 
     def forward_with_activations(self, coords, params=None, retain_grad=False):
@@ -138,7 +142,7 @@ class SingleBVPNet(MetaModule):
                                                     downsample=kwargs.get('downsample', False))
         self.net = FCBlock(in_features=in_features, out_features=out_features, num_hidden_layers=num_hidden_layers,
                            hidden_features=hidden_features, outermost_linear=True, nonlinearity=type)
-        print(self)
+        # print(self)
 
     def forward(self, model_input, params=None):
         if params is None:
