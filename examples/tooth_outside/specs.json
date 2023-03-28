@@ -22,7 +22,9 @@
                 1,
                 2,
                 3,
-                4
+                4,
+                5,
+                6
             ],
             "dropout_prob": 0.05,
             "norm_layers": [
@@ -30,7 +32,9 @@
                 1,
                 2,
                 3,
-                4
+                4,
+                5,
+                6
             ],
             "xyz_in_all": false,
             "weight_norm": true
