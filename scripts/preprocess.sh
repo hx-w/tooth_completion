@@ -9,5 +9,6 @@ python3 preprocess_data.py \
     --source tooth_morphology/datasets \
     --name ToothMorphology \
     --split examples/splits/tooth_${1}_${2}.json \
-    --unify_center
+    --unify_center \
+    # --unify_scale
     # --skip \

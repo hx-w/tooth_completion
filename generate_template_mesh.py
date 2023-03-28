@@ -60,25 +60,25 @@ def code_to_mesh(experiment_directory, checkpoint):
             decoder.forward_template,
             None,
             mesh_filename + "_XOZ.png",
-            24, 1080, None, -1.5, None
+            22, 512, None, 0, None
         )
         deep_sdf.mesh.create_slice_heatmap(
             decoder.forward_template,
             None,
             mesh_filename + "_YOZ.png",
-            24, 1080, 0, None, None
+            22, 512, 0, None, None
         )
 
-        deep_sdf.mesh.create_mesh(
-            decoder.forward_template,
-            None,
-            mesh_filename,
-            N=512,
-            max_batch=int(2 ** 20),
-            offset=offset,
-            scale=scale,
-            volume_size=20.0
-        )
+        # deep_sdf.mesh.create_mesh(
+        #     decoder.forward_template,
+        #     None,
+        #     mesh_filename,
+        #     N=512,
+        #     max_batch=int(2 ** 20),
+        #     offset=offset,
+        #     scale=scale,
+        #     volume_size=20.0
+        # )
 
 
 if __name__ == "__main__":

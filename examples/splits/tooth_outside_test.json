@@ -1,7 +1,8 @@
 {
     "ToothMorphology": {
-        "right_maxillary_central_incisor_outside": [
-            "n31_zhaojinfeng"
+        "right_maxillary_central_incisor_outside_defect": [
+            "n31_zhaojinfeng",
+            "case1_zyp"
         ]
     }
 }
