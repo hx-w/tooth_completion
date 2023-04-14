@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.utils.data as data_utils
 import torch.nn
+import torch.nn.functional as F
 import signal
 import sys
 import os
@@ -336,27 +337,31 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
         batch_num = len(sdf_loader)
-        for bi, (sdf_data, indices) in enumerate(sdf_loader):
+        for bi, (datas, indices) in enumerate(sdf_loader):
             # Process the input data
-            sdf_data = sdf_data.reshape(-1, 4)
+            coords = datas['coords'].reshape((-1, 3))
+            # normals = datas['normals'].reshape((-1, 3))
+            sdfs = datas['sdfs'].reshape((-1, 1)).unsqueeze(1)
+            num_sdf_samples = coords.shape[0]
 
-            num_sdf_samples = sdf_data.shape[0]
+            # sdf_data.requires_grad = False
+            sdfs.requires_grad = False
+            coords.requires_grad = False
 
-            sdf_data.requires_grad = False
-
-            xyz = sdf_data[:, 0:3]
-            sdf_gt = sdf_data[:, 3].unsqueeze(1)
+            # xyz = sdf_data[:, 0:3]
+            # sdf_gt = sdf_data[:, 3].unsqueeze(1)
 
             if enforce_minmax:
-                sdf_gt = torch.clamp(sdf_gt, minT, maxT)
+                sdfs = torch.clamp(sdfs, minT, maxT)
 
-            xyz = torch.chunk(xyz, batch_split)
+            coords = torch.chunk(coords, batch_split)
+            sdfs = torch.chunk(sdfs, batch_split)
+            # normals = torch.chunk(normals, batch_split)
+
             indices = torch.chunk(
                 indices.unsqueeze(-1).repeat(1, num_samp_per_scene).view(-1),
                 batch_split,
             )
-
-            sdf_gt = torch.chunk(sdf_gt, batch_split)
 
             batch_loss_sdf = 0.0
             batch_loss_pw = 0.0
@@ -369,9 +374,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             for i in range(batch_split):
 
                 batch_vecs = lat_vecs(indices[i])
-
-                input = torch.cat([batch_vecs, xyz[i]], dim=1)
-                xyz_ = xyz[i].cuda()
+                input = torch.cat([batch_vecs, coords[i]], dim=1).to(torch.float32)
+                xyz_ = coords[i].cuda()
 
                 # NN optimization
                 warped_xyz_list, pred_sdf_list = decoder(
@@ -384,9 +388,9 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
 
                 if use_curriculum:
                     sdf_loss = apply_curriculum_l1_loss(
-                        pred_sdf_list, sdf_gt[i].cuda(), loss_l1_soft, num_sdf_samples)
+                        pred_sdf_list, sdfs[i].cuda(), loss_l1_soft, num_sdf_samples)
                 else:
-                    sdf_loss = loss_l1(pred_sdf_list[-1], sdf_gt[i].cuda()) / num_sdf_samples
+                    sdf_loss = loss_l1(pred_sdf_list[-1], sdfs[i].cuda()) / num_sdf_samples
                 batch_loss_sdf += sdf_loss.item()
                 chunk_loss = sdf_loss
 
@@ -415,7 +419,7 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                     chunk_loss += lp_loss.cuda() * pointpair_loss_weight * min(1.0, epoch / 100)
 
                     del lp_loss
-
+                
                 chunk_loss.backward()
                 batch_loss += chunk_loss.item()
 

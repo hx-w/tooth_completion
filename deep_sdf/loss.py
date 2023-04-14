@@ -45,6 +45,7 @@ class SoftL1Loss(nn.Module):
         self.reduction = reduction
 
     def forward(self, input, target, eps=0.0, lamb=0.0):
+        target = target.reshape(-1, 1)
         ret = torch.abs(input - target) - eps
         ret = torch.clamp(ret, min=0.0, max=100.0)
         ret = ret * (1 + lamb * torch.sign(target) * torch.sign(target-input))

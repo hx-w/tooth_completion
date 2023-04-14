@@ -76,11 +76,12 @@ class FCBlock(MetaModule):
 
         if outermost_linear:
             self.net.append(MetaSequential(nn.Linear(hidden_features, out_features)))
+            # self.net.append(nn.ReLU())
         else:
             self.net.append(MetaSequential(
                 nn.utils.weight_norm(nn.Linear(hidden_features, out_features)), nl
             ))
-        self.net.append(nn.Tanh())
+        # self.net.append(nn.Tanh())
 
         self.net = MetaSequential(*self.net)
         if self.weight_init is not None:

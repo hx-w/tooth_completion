@@ -66,19 +66,27 @@ def read_sdf_samples_into_ram(filename):
     npz = np.load(filename)
     pos_tensor = torch.from_numpy(npz["pos"])
     neg_tensor = torch.from_numpy(npz["neg"])
+    surf_pnts_tensor = torch.from_numpy(npz["surf_pnts"])
+    surf_norms_tensor = torch.from_numpy(npz["surf_norms"])
+    on_surfs = torch.cat([surf_pnts_tensor, surf_norms_tensor], 1)
 
-    return [pos_tensor, neg_tensor]
+    return [pos_tensor, neg_tensor, on_surfs]
 
 
 def unpack_sdf_samples(filename, subsample=None):
+    # 2, 2, 1
+
     npz = np.load(filename)
     if subsample is None:
         return npz
     pos_tensor = remove_nans(torch.from_numpy(npz["pos"]))
     neg_tensor = remove_nans(torch.from_numpy(npz["neg"]))
+    surf_pnts_tensor = torch.from_numpy(npz["surf_pnts"])
+    surf_norms_tensor = torch.from_numpy(npz["surf_norms"])
+    on_surfs = torch.cat([surf_pnts_tensor, surf_norms_tensor], 1)
 
     # split the sample into half
-    half = int(subsample / 2)
+    half = int(2 * subsample / 5)
 
     random_pos = (torch.rand(half) * pos_tensor.shape[0]).long()
     random_neg = (torch.rand(half) * neg_tensor.shape[0]).long()
@@ -90,7 +98,18 @@ def unpack_sdf_samples(filename, subsample=None):
     randidx = torch.randperm(samples.shape[0])
     samples = torch.index_select(samples, 0, randidx)
 
-    return samples
+    # same as DIF
+    total_sample = samples.shape[0] + sample_surf.shape[0]
+    coords = torch.cat([samples[:, :3], sample_surf[:, :3]], 0)
+    # normals = torch.ones((total_sample, 3)) * -1
+    # normals[samples.shape[0]:, ] = sample_surf[:, 3:]
+    sdfs = torch.zeros((total_sample, 1))
+    sdfs[:samples.shape[0], ] = samples[:, 3]
+    return {
+        'coords': coords,
+        'sdfs': sdfs,
+        # 'normals': normals
+    }
 
 
 def unpack_sdf_samples_from_ram(data, subsample=None):
@@ -98,8 +117,10 @@ def unpack_sdf_samples_from_ram(data, subsample=None):
         return data
     pos_tensor = data[0]
     neg_tensor = data[1]
+    on_surfs = data[2]
 
     # split the sample into half
+    # half = int(2 * subsample / 5)
     half = int(subsample / 2)
 
     pos_size = pos_tensor.shape[0]
@@ -115,12 +136,38 @@ def unpack_sdf_samples_from_ram(data, subsample=None):
         neg_start_ind = random.randint(0, neg_size - half)
         sample_neg = neg_tensor[neg_start_ind : (neg_start_ind + half)]
 
+    on_surf_num = int(half / 2)
+    if on_surfs.shape[0] > on_surf_num:
+        ind = random.randint(0, on_surfs.shape[0] - on_surf_num)
+        sample_surf = on_surfs[ind : (ind + on_surf_num)]
+    else:
+        random_surf = (torch.rand(on_surf_num) * on_surfs.shape[0]).long()
+        sample_surf = torch.index_select(on_surfs, 0, random_surf)
+
     samples = torch.cat([sample_pos, sample_neg], 0)
     randidx = torch.randperm(samples.shape[0])
     samples = torch.index_select(samples, 0, randidx)
 
-    return samples
+    randidx = torch.randperm(sample_surf.shape[0])
+    sample_surf = torch.index_select(sample_surf, 0, randidx)
+    
+    return {
+        'coords': samples[:, :3],
+        'sdfs': samples[:, 3:]
+    }
 
+    # same as DIF
+    total_sample = samples.shape[0] + sample_surf.shape[0]
+    coords = torch.cat([samples[:, :3], sample_surf[:, :3]], 0)
+    # normals = torch.ones((total_sample, 3)) * -1
+    # normals[samples.shape[0]:, ] = sample_surf[:, 3:]
+    sdfs = torch.zeros((total_sample, 1))
+    sdfs[:samples.shape[0], ] = samples[:, 3:]
+    return {
+        'coords': coords,
+        'sdfs': sdfs,
+        # 'normals': normals
+    }
 
 class SDFSamples(torch.utils.data.Dataset):
     def __init__(
@@ -153,10 +200,14 @@ class SDFSamples(torch.utils.data.Dataset):
                 npz = np.load(filename)
                 pos_tensor = remove_nans(torch.from_numpy(npz["pos"]))
                 neg_tensor = remove_nans(torch.from_numpy(npz["neg"]))
+                surf_pnts_tensor = torch.from_numpy(npz["surf_pnts"])
+                surf_norms_tensor = torch.from_numpy(npz["surf_norms"])
+                on_surfs = torch.cat([surf_pnts_tensor, surf_norms_tensor], 1)
                 self.loaded_data.append(
                     [
                         pos_tensor[torch.randperm(pos_tensor.shape[0])],
                         neg_tensor[torch.randperm(neg_tensor.shape[0])],
+                        on_surfs[torch.randperm(on_surfs.shape[0])],
                     ]
                 )
 

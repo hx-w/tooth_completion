@@ -178,32 +178,31 @@ class Decoder(nn.Module):
     def __init__(self, latent_size, warper_kargs, decoder_kargs):
         super(Decoder, self).__init__()
         self.warper = Warper(latent_size, **warper_kargs)
-        # self.sdf_decoder = SdfDecoder(**decoder_kargs)
-        self.sdf_decoder = SingleBVPNet(type='relu', in_features=3, num_hidden_layers=6)
+        self.sdf_decoder = SdfDecoder(**decoder_kargs)
+        # self.sdf_decoder = SingleBVPNet(type='tanh', in_features=3, hidden_features=256, num_hidden_layers=3)
 
     def forward(self, input, output_warped_points=False, step=1.0):
         p_final, warped_xyzs = self.warper(input, step=step)
 
         if not self.training:
-            x = self.sdf_decoder({'coords': p_final})['model_out']
-            # x = self.sdf_decoder(p_final)
+            # x = self.sdf_decoder({'coords': p_final})['model_out']
+            x = self.sdf_decoder(p_final)
             if output_warped_points:
                 return p_final, x
             else:
                 return x
         else:   # training mode, output intermediate positions and their corresponding sdf prediction
             xs = []
-            grads = []
             for p in warped_xyzs:
-                model_output_temp = self.sdf_decoder({'coords': p})
-                sdf = model_output_temp['model_out'] # SDF value in template space
-                xs.append(sdf)
-                # xs.append(self.sdf_decoder(p))
+                # model_output_temp = self.sdf_decoder({'coords': p})
+                # sdf = model_output_temp['model_out'] # SDF value in template space
+                # xs.append(sdf)
+                xs.append(self.sdf_decoder(p))
             if output_warped_points:
-                return warped_xyzs, xs 
+                return warped_xyzs, xs
             else:
                 return xs
 
     def forward_template(self, input):
-        return self.sdf_decoder({'coords': input})['model_out']
-        # return self.sdf_decoder(input)
+        # return self.sdf_decoder({'coords': input})['model_out']
+        return self.sdf_decoder(input)

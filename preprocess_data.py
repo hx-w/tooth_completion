@@ -128,7 +128,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--threads",
         dest="num_threads",
-        default=8,
+        default=10,
         help="The number of threads to use to process the data.",
     )
     arg_parser.add_argument(

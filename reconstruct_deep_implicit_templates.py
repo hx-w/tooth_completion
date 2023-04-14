@@ -54,9 +54,9 @@ def reconstruct(
         decoder.eval()
         sdf_data = deep_sdf.data.unpack_sdf_samples_from_ram(
             test_sdf, num_samples
-        ).cuda()
-        xyz = sdf_data[:, 0:3]
-        sdf_gt = sdf_data[:, 3].unsqueeze(1)
+        )
+        xyz = sdf_data['coords'].cuda()
+        sdf_gt = sdf_data['sdfs'].cuda().unsqueeze(1)
 
         sdf_gt = torch.clamp(sdf_gt, -clamp_dist, clamp_dist)
 
@@ -66,7 +66,7 @@ def reconstruct(
 
         latent_inputs = latent.expand(num_samples, -1)
 
-        inputs = torch.cat([latent_inputs, xyz], 1).cuda()
+        inputs = torch.cat([latent_inputs, xyz], 1).cuda().to(torch.float32)
 
         pred_sdf = decoder(inputs)
 
@@ -76,7 +76,7 @@ def reconstruct(
 
         pred_sdf = torch.clamp(pred_sdf, -clamp_dist, clamp_dist)
 
-        loss = loss_l1(pred_sdf, sdf_gt)
+        loss = loss_l1(pred_sdf, sdf_gt.reshape(pred_sdf.shape))
         if l2reg:
             loss += 1e-3 * torch.mean(latent.pow(2))
         loss.backward()
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--iters",
         dest="iterations",
-        default=20,
+        default=800,
         help="The number of iterations of latent code optimization to perform.",
     )
     arg_parser.add_argument(
@@ -302,7 +302,7 @@ if __name__ == "__main__":
                     latent_size,
                     data_sdf,
                     0.01,  # [emp_mean,emp_var],
-                    0.01,
+                    0.1,
                     num_samples=10000,
                     lr=2e-2,
                     l2reg=True,
@@ -326,16 +326,6 @@ if __name__ == "__main__":
             if not save_latvec_only:
                 start = time.time()
                 with torch.no_grad():
-                    if args.use_octree:
-                        deep_sdf.mesh.create_mesh_octree(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 17),
-                            clamp_func=clamping_function, volume_size=20
-                        )
-                    else:
-                        deep_sdf.mesh.create_mesh(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 17), volume_size=20
-                        )
-                    
                     deep_sdf.mesh.create_slice_heatmap(
                         decoder,
                         latent,
@@ -348,6 +338,15 @@ if __name__ == "__main__":
                         mesh_filename + "_YOZ.png",
                         22, 512, 0, None, None
                     )
+                    if args.use_octree:
+                        deep_sdf.mesh.create_mesh_octree(
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18),
+                            clamp_func=clamping_function, volume_size=20
+                        )
+                    else:
+                        deep_sdf.mesh.create_mesh(
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18), volume_size=20
+                        )
                 logging.debug("total time: {}".format(time.time() - start))
 
             if not os.path.exists(os.path.dirname(latent_filename)):
