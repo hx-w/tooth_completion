@@ -24,13 +24,17 @@ def reconstruct(
     stat,
     clamp_dist,
     num_samples=30000,
-    lr=5e-4,
+    lr=1e-2,
     l2reg=False,
 ):
     def adjust_learning_rate(
-        initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every
+        initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every, iter
     ):
         lr = initial_lr * ((1 / decreased_by) ** (num_iterations // adjust_lr_every))
+        # lr = initial_lr * (1 / decreased_by)
+        if iter % 100 == 0:
+            logging.info("iter: " + str(iter))
+            logging.info("lr: " + str(lr))
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
@@ -60,7 +64,7 @@ def reconstruct(
 
         sdf_gt = torch.clamp(sdf_gt, -clamp_dist, clamp_dist)
 
-        adjust_learning_rate(lr, optimizer, e, decreased_by, adjust_lr_every)
+        adjust_learning_rate(lr, optimizer, e, decreased_by, adjust_lr_every, e)
 
         optimizer.zero_grad()
 
@@ -71,8 +75,8 @@ def reconstruct(
         pred_sdf = decoder(inputs)
 
         # TODO: why is this needed?
-        # if e == 0:
-        #     pred_sdf = decoder(inputs)
+        if e == 0:
+            pred_sdf = decoder(inputs)
 
         pred_sdf = torch.clamp(pred_sdf, -clamp_dist, clamp_dist)
 
@@ -82,7 +86,7 @@ def reconstruct(
         loss.backward()
         optimizer.step()
 
-        if e % 1000 == 0:
+        if e % 100 == 0:
             logging.info(loss.item())
             logging.info(e)
             logging.info(latent.norm())
@@ -304,7 +308,7 @@ if __name__ == "__main__":
                     0.01,  # [emp_mean,emp_var],
                     0.1,
                     num_samples=10000,
-                    lr=2e-2,
+                    lr=5e-3,
                     l2reg=True,
                 )
                 logging.info("reconstruct time: {}".format(time.time() - start))
@@ -338,15 +342,15 @@ if __name__ == "__main__":
                         mesh_filename + "_YOZ.png",
                         22, 512, 0, None, None
                     )
-                    if args.use_octree:
-                        deep_sdf.mesh.create_mesh_octree(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18),
-                            clamp_func=clamping_function, volume_size=20
-                        )
-                    else:
-                        deep_sdf.mesh.create_mesh(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18), volume_size=20
-                        )
+                    # if args.use_octree:
+                    #     deep_sdf.mesh.create_mesh_octree(
+                    #         decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18),
+                    #         clamp_func=clamping_function, volume_size=20
+                    #     )
+                    # else:
+                    #     deep_sdf.mesh.create_mesh(
+                    #         decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18), volume_size=20
+                    #     )
                 logging.debug("total time: {}".format(time.time() - start))
 
             if not os.path.exists(os.path.dirname(latent_filename)):

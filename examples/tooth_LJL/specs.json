@@ -1,8 +1,8 @@
 {
     "Description": "This experiment learns a shape representation for outside teeth",
     "DataSource": "data/",
-    "TrainSplit": "examples/splits/tooth_outside_train.json",
-    "TestSplit": "examples/splits/tooth_outside_test.json",
+    "TrainSplit": "examples/splits/tooth_[LJL]_train.json",
+    "TestSplit": "examples/splits/tooth_[LJL]_test.json",
     "NetworkArch": "deep_implicit_template_decoder",
     "NetworkSpecs": {
         "warper_kargs": {
@@ -34,7 +34,7 @@
         }
     },
     "CodeLength": 256,
-    "NumEpochs": 1001,
+    "NumEpochs": 301,
     "SnapshotFrequency": 1000,
     "AdditionalSnapshots": [
         100,
@@ -63,7 +63,7 @@
             "Factor": 0.5
         }
     ],
-    "SamplesPerScene": 6000,
+    "SamplesPerScene": 5000,
     "ScenesPerBatch": 16,
     "DataLoaderThreads": 0,
     "ClampingDistance": 0.1,

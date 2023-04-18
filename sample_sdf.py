@@ -64,10 +64,10 @@ if __name__ == '__main__':
         )
 
         datas = np.concatenate([pnts, sdfs.reshape(-1, 1)], axis=1)
-        reserved_ = datas[datas[:, 2] <= -0.0]
-        clipped_ = datas[datas[:, 2] > -0.0]
+        reserved_ = datas[datas[:, 2] < 0.0]
+        clipped_ = datas[datas[:, 2] >= 0.0]
         np.random.shuffle(clipped_)
-        clipped_ = clipped_[:int(clipped_.shape[0] / 2), :]
+        clipped_ = clipped_[:int(clipped_.shape[0] / 4), :]
         datas = np.concatenate([clipped_, reserved_], axis=0)
 
         pnts = datas[:, :3]
@@ -80,10 +80,10 @@ if __name__ == '__main__':
         )
 
         surfs = np.concatenate([pntcloud.points, pntcloud.normals], axis=1)
-        reserved_ = surfs[surfs[:, 2] <= -0.0]
-        clipped_ = surfs[surfs[:, 2] > -0.0]
+        reserved_ = surfs[surfs[:, 2] < 0.0]
+        clipped_ = surfs[surfs[:, 2] >= 0.0]
         np.random.shuffle(clipped_)
-        clipped_ = clipped_[:int(clipped_.shape[0] / 2), :]
+        clipped_ = clipped_[:int(clipped_.shape[0] / 4), :]
         surfs = np.concatenate([clipped_, reserved_], axis=0)
         surf_pnts = surfs[:, :3]
         surf_norms = surfs[:, 3:]
@@ -91,6 +91,7 @@ if __name__ == '__main__':
         res = np.hstack([pnts, sdfs.reshape(-1, 1)])
         res2 = np.hstack([surf_pnts, np.zeros((surf_pnts.shape[0], 1))])
         res = np.concatenate([res, res2], axis=0)
+        # res = res2
 
         pos = res[res[:, 3] >= 0]
         neg = res[res[:, 3] < 0]

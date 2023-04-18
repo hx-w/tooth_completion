@@ -1,0 +1,36 @@
+{
+    "ToothMorphology": {
+        "[LJL]_left_maxillary_lateral_incisor_outside": [
+            "n13_huanglamei",
+            "n16_jianglirong",
+            "n5_yingaijun",
+            "n17_kangyixi",
+            "n4_lijuan",
+            "n34_jiayang",
+            "n37_lixiaochen",
+            "n14_huangzhuo",
+            "n29_zhangyaopeng",
+            "n35_heting",
+            "n28_zhangguangying",
+            "n31_zhaojinfeng",
+            "n11_houhailong",
+            "n36_dujinwen",
+            "n30_zhangzengxiang",
+            "n15_jianghai",
+            "n10_heyulin",
+            "n33_xuzhe",
+            "n25_shenmin",
+            "n1_chenshun",
+            "n23_penglihua",
+            "n32_zhaolinwen",
+            "n3_kongqi",
+            "n8_dengke",
+            "n12_hulinglan",
+            "n2_kongpingxiang",
+            "n6_caoyingchun",
+            "n26_songfugao",
+            "n7_dengbangrong",
+            "n19_liqingli"
+        ]
+    }
+}

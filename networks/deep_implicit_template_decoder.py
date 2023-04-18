@@ -6,8 +6,9 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import math
+from torchmeta.modules import MetaSequential
 
-from .modules import SingleBVPNet
+from .modules import SingleBVPNet, Sine
 
 class SdfDecoder(nn.Module):
     def __init__(
@@ -58,6 +59,7 @@ class SdfDecoder(nn.Module):
         self.dropout_prob = dropout_prob
         self.dropout = dropout
         self.th = nn.Tanh()
+        self.sine = Sine()
 
     # input: N x (L+3)
     def forward(self, input):
@@ -71,7 +73,8 @@ class SdfDecoder(nn.Module):
             x = lin(x)
             # last layer Tanh
             if layer == self.num_layers - 2 and self.use_tanh:
-                x = self.tanh(x)
+                # x = self.tanh(x)
+                x = self.sine(x)
             if layer < self.num_layers - 2:
                 if (
                     self.norm_layers is not None
@@ -80,7 +83,8 @@ class SdfDecoder(nn.Module):
                 ):
                     bn = getattr(self, "bn" + str(layer))
                     x = bn(x)
-                x = self.relu(x)
+                x = self.sine(x)
+                # x = self.relu(x)
                 if self.dropout is not None and layer in self.dropout:
                     x = F.dropout(x, p=self.dropout_prob, training=self.training)
 

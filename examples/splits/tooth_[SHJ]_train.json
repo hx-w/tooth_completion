@@ -1,0 +1,30 @@
+{
+    "ToothMorphology": {
+        "[SHJ]_right_maxillary_canine_outside": [
+            "n1_ChenShun",
+            "n17_KangYiXi",
+            "n13_HuangLaMei",
+            "n14_HuangZhuo",
+            "n25_ShenMin",
+            "n23_PengLiHua",
+            "n21_LuoShuXi",
+            "n3_KongQi",
+            "n16_JiangLiRong",
+            "n19_LiQingLi",
+            "n9_HeYuXing",
+            "n18_LiMengLan",
+            "n15_JiangHai",
+            "n2_KongPingXiang",
+            "n7_DengBangRong",
+            "n4_LiJuan",
+            "n5_YinGaiJun",
+            "n24_QiaoHongJin",
+            "n12_HuLingLan",
+            "n10_HeYuLin",
+            "n20_LiQunFang",
+            "n22_MingTing",
+            "n8_DengKe",
+            "n11_HouHaiLong"
+        ]
+    }
+}

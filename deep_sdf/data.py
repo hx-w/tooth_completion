@@ -50,8 +50,14 @@ def find_mesh_in_directory(shape_dir):
     mesh_filenames = list(glob.iglob(shape_dir + "/**/*.obj")) + list(
         glob.iglob(shape_dir + "/*.obj")
     )
+
     if len(mesh_filenames) == 0:
-        raise NoMeshFileError()
+        files = list(filter(lambda x: x.endswith('.obj'), os.listdir(shape_dir)))
+        if len(files) == 0:
+            raise NoMeshFileError()
+        else:
+            mesh_filenames = [os.path.join(shape_dir, files[0])]
+            return mesh_filenames[0]
     elif len(mesh_filenames) > 1:
         raise MultipleMeshFileError()
     return mesh_filenames[0]
@@ -120,8 +126,8 @@ def unpack_sdf_samples_from_ram(data, subsample=None):
     on_surfs = data[2]
 
     # split the sample into half
-    # half = int(2 * subsample / 5)
-    half = int(subsample / 2)
+    half = int(2 * subsample / 5)
+    # half = int(subsample / 2)
 
     pos_size = pos_tensor.shape[0]
     neg_size = neg_tensor.shape[0]
@@ -151,6 +157,9 @@ def unpack_sdf_samples_from_ram(data, subsample=None):
     randidx = torch.randperm(sample_surf.shape[0])
     sample_surf = torch.index_select(sample_surf, 0, randidx)
     
+    samples = torch.cat([samples, torch.zeros((sample_surf.shape[0], 4))], 0)
+    samples[-sample_surf.shape[0]:, :3] = sample_surf[:, :3]
+
     return {
         'coords': samples[:, :3],
         'sdfs': samples[:, 3:]
