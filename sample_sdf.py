@@ -67,7 +67,7 @@ if __name__ == '__main__':
         reserved_ = datas[datas[:, 2] < 0.0]
         clipped_ = datas[datas[:, 2] >= 0.0]
         np.random.shuffle(clipped_)
-        clipped_ = clipped_[:int(clipped_.shape[0] / 4), :]
+        clipped_ = clipped_[:int(clipped_.shape[0] / 1.5), :]
         datas = np.concatenate([clipped_, reserved_], axis=0)
 
         pnts = datas[:, :3]
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         reserved_ = surfs[surfs[:, 2] < 0.0]
         clipped_ = surfs[surfs[:, 2] >= 0.0]
         np.random.shuffle(clipped_)
-        clipped_ = clipped_[:int(clipped_.shape[0] / 4), :]
+        clipped_ = clipped_[:int(clipped_.shape[0] / 1.5), :]
         surfs = np.concatenate([clipped_, reserved_], axis=0)
         surf_pnts = surfs[:, :3]
         surf_norms = surfs[:, 3:]

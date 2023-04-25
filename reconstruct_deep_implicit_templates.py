@@ -307,7 +307,7 @@ if __name__ == "__main__":
                     data_sdf,
                     0.01,  # [emp_mean,emp_var],
                     0.1,
-                    num_samples=10000,
+                    num_samples=30000,
                     lr=5e-3,
                     l2reg=True,
                 )
@@ -342,15 +342,15 @@ if __name__ == "__main__":
                         mesh_filename + "_YOZ.png",
                         22, 512, 0, None, None
                     )
-                    # if args.use_octree:
-                    #     deep_sdf.mesh.create_mesh_octree(
-                    #         decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18),
-                    #         clamp_func=clamping_function, volume_size=20
-                    #     )
-                    # else:
-                    #     deep_sdf.mesh.create_mesh(
-                    #         decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18), volume_size=20
-                    #     )
+                    if args.use_octree:
+                        deep_sdf.mesh.create_mesh_octree(
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18),
+                            clamp_func=clamping_function, volume_size=20
+                        )
+                    else:
+                        deep_sdf.mesh.create_mesh(
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 18), volume_size=20
+                        )
                 logging.debug("total time: {}".format(time.time() - start))
 
             if not os.path.exists(os.path.dirname(latent_filename)):
