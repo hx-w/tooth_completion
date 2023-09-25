@@ -48,11 +48,7 @@ def filter_classes(patterns, classes):
 def process_mesh(mesh_filepath, target_filepath, executable, additional_args):
     logging.info(mesh_filepath + " --> " + target_filepath)
 
-    command = ['python3', 'sample_sdf.py', '-m', mesh_filepath, '-o', target_filepath] + additional_args
-    # if '--us' in additional_args:
-    #     command = ["python3", "sample_sdf.py", "-m", mesh_filepath, "-o", target_filepath]
-    # else:
-    #     command = [executable, "-m", mesh_filepath, "-o", target_filepath] + additional_args
+    command = ['python', 'sample_sdf.py', '-m', mesh_filepath, '-o', target_filepath] + additional_args
 
     subproc = subprocess.Popen(command, stdout=subprocess.DEVNULL)
     subproc.wait()
@@ -147,20 +143,7 @@ if __name__ == "__main__":
         help="If set, the script will produce mesh surface samples for evaluation. "
         + "Otherwise, the script will produce SDF samples for training.",
     )
-    arg_parser.add_argument(
-        "--unify_center",
-        dest="unify_center",
-        default=False,
-        action="store_true",
-        help="If set, the script will unify the meshes in the source directory.",
-    )
-    arg_parser.add_argument(
-        "--unify_scale",
-        dest="unify_scale",
-        default=False,
-        action="store_true",
-        help="If set, the script will unify the meshes in the source directory.",
-    )
+
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -182,10 +165,6 @@ if __name__ == "__main__":
 
         if args.test_sampling:
             additional_general_args += ["-t"]
-        if args.unify_center:
-            additional_general_args += ["-c"]
-        if args.unify_scale:
-            additional_general_args += ["-s"]
 
     with open(args.split_filename, "r") as f:
         split = json.load(f)

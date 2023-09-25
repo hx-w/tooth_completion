@@ -61,7 +61,7 @@ def apply_pointwise_reg(warped_xyz_list, xyz_, huber_fn, num_sdf_samples):
     pw_loss = []
     for k in range(len(warped_xyz_list)):
         dist = torch.norm(warped_xyz_list[k] - xyz_, dim=-1)
-        pw_loss.append(huber_fn(dist, delta=0.25) / num_sdf_samples)
+        pw_loss.append(huber_fn(dist, delta=0.75) / num_sdf_samples)
         # pw_loss.append(torch.sum((warped_xyz_list[k] - xyz_) ** 2) / num_sdf_samples)
     pw_loss = sum(pw_loss) / len(pw_loss)
     return pw_loss
@@ -178,7 +178,10 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
 
     code_bound = get_spec_with_default(specs, "CodeBound", None)
 
-    decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
+    if specs["NetworkArch"] == "deep_sdf_decoder":
+        decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]["decoder_kargs"]).cuda()
+    else:
+        decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
 
     logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
 
@@ -251,8 +254,6 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             },
         ]
     )
-
-    tensorboard_saver = ws.create_tensorboard_saver(experiment_directory)
 
     loss_log = []
     lr_log = []
@@ -473,7 +474,7 @@ if __name__ == "__main__":
 
     import argparse
 
-    arg_parser = argparse.ArgumentParser(description="Train a DeepSDF autodecoder")
+    arg_parser = argparse.ArgumentParser(description="Train a ToothDIT autodecoder")
     arg_parser.add_argument(
         "--experiment",
         "-e",
@@ -501,7 +502,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--batch_split",
         dest="batch_split",
-        default=1,
+        default=4,
         help="This splits the batch into separate subbatches which are "
         + "processed separately, with gradients accumulated across all "
         + "subbatches. This allows for training with large effective batch "

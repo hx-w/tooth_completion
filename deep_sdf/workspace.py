@@ -4,7 +4,6 @@
 import json
 import os
 import torch
-from tensorboardX import SummaryWriter
 
 model_params_subdir = "ModelParameters"
 optimizer_params_subdir = "OptimizerParameters"
@@ -350,9 +349,6 @@ def get_normalization_params_filename(
         instance_name + ".npz",
     )
 
-
-def create_tensorboard_saver(experiment_dir):
-    return SummaryWriter(get_tensorboard_logs_dir(experiment_dir, True))
 
 
 def save_tensorboard_logs(saver, step, **kargs):

@@ -34,28 +34,13 @@ if __name__ == '__main__':
         dest="output_path",
         required=True
     )
-    arg_parser.add_argument(
-        "--unify_center",
-        "-c",
-        dest="unify_center",
-        default=False,
-        action="store_true",
-    )
-    arg_parser.add_argument(
-        "--unify_scale",
-        "-s",
-        dest="unify_scale",
-        default=False,
-        action="store_true",
-    )
+
     args = arg_parser.parse_args()
 
     try:
         mesh = trimesh.load(args.mesh_path)
         mesh.remove_unreferenced_vertices()
         mesh.remove_duplicate_faces()
-
-        # mesh.vertices -= mesh.bounding_box.centroid
 
         pnts, sdfs = mesh_to_sdf.sample_sdf_near_surface(
             mesh,
@@ -96,10 +81,8 @@ if __name__ == '__main__':
         pos = res[res[:, 3] >= 0]
         neg = res[res[:, 3] < 0]
 
-        # save_pointcloud_to_ply(pos, 'pos.ply')
-        # save_pointcloud_to_ply(neg, 'neg.ply')
-
         np.savez(args.output_path, pos=pos, neg=neg, surf_pnts=surf_pnts, surf_norms=surf_norms)
 
     except Exception as e:
+        print(f'==>{e}')
         raise f'error: {e}'

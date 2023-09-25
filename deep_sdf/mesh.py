@@ -9,6 +9,7 @@ import time
 import torch
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import deep_sdf.utils
 
@@ -41,7 +42,7 @@ def create_slice_heatmap(
     style = 'coolwarm'
     plt.figure(figsize = (50, 50))
     htmap = sns.heatmap(sdfs, cmap=style, cbar=False, xticklabels=False, yticklabels=False)
-    htmap.get_figure().savefig(filename)
+    htmap.get_figure().savefig(filename, pad_inches=False, bbox_inches='tight')
 
 
 def create_mesh(
@@ -75,7 +76,17 @@ def create_mesh(
 
     head = 0
 
-    while head < num_samples:
+    # while head < num_samples:
+    #     sample_subset = samples[head : min(head + max_batch, num_samples), 0:3].cuda()
+
+    #     samples[head : min(head + max_batch, num_samples), 3] = (
+    #         deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)
+    #         .squeeze(1)
+    #         .detach()
+    #         .cpu()
+    #     )
+    #     head += max_batch
+    for head in tqdm(range(0, num_samples, max_batch), desc='提取零等值面网格'):
         sample_subset = samples[head : min(head + max_batch, num_samples), 0:3].cuda()
 
         samples[head : min(head + max_batch, num_samples), 3] = (
@@ -84,7 +95,7 @@ def create_mesh(
             .detach()
             .cpu()
         )
-        head += max_batch
+
 
     sdf_values = samples[:, 3]
     sdf_values = sdf_values.reshape(N, N, N)
@@ -129,8 +140,8 @@ def create_mesh_octree(
     samples = samples.reshape([N, N, N, 4])
 
     sdf_values = np.zeros([N, N, N], dtype=np.float32)
-    dirty = np.ones([N, N, N], dtype=np.bool)
-    grid_mask = np.zeros_like(dirty, dtype=np.bool)
+    dirty = np.ones([N, N, N], dtype=bool)
+    grid_mask = np.zeros_like(dirty, dtype=bool)
 
     init_res = 64
     ignore_thres = volume_size / N / 4
@@ -237,7 +248,7 @@ def convert_sdf_samples_to_ply(
         raise NotImplementedError
 
     verts, faces, normals, values = skimage.measure.marching_cubes(
-        numpy_3d_sdf_tensor, level=0, spacing=[voxel_size] * 3
+        numpy_3d_sdf_tensor, level=None, spacing=[voxel_size] * 3
     )
 
     # transform from voxel coordinates to camera coordinates

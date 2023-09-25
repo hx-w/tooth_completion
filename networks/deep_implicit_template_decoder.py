@@ -6,9 +6,17 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import math
-from torchmeta.modules import MetaSequential
 
-from .modules import SingleBVPNet, Sine
+# from .modules import SingleBVPNet, Sine
+
+class Sine(nn.Module):
+    def __init(self):
+        super().__init__()
+
+    def forward(self, input):
+        # See paper sec. 3.2, final paragraph, and supplement Sec. 1.5 for discussion of factor 30
+        return torch.sin(3.2 * input)
+
 
 class SdfDecoder(nn.Module):
     def __init__(
@@ -88,8 +96,8 @@ class SdfDecoder(nn.Module):
                 if self.dropout is not None and layer in self.dropout:
                     x = F.dropout(x, p=self.dropout_prob, training=self.training)
 
-        if hasattr(self, "th"):
-            x = self.th(x)
+        # if hasattr(self, "th"):
+        #     x = self.th(x)
 
         return x
 
@@ -148,6 +156,7 @@ class Warper(nn.Module):
         lstm_forget_gate_init(self.lstm)
 
         self.out_layer_coord_affine = nn.Linear(hidden_size, 6)
+        # self.out_layer_coord_affine = nn.Linear(hidden_size, 3)
         self.out_layer_coord_affine.apply(init_out_weights)
 
     def forward(self, input, step=1.0):
@@ -162,10 +171,11 @@ class Warper(nn.Module):
         for s in range(self.steps):
             state = self.lstm(torch.cat([code, xyz], dim=1), states[-1])
             if state[0].requires_grad:
-                state[0].register_hook(lambda x: x.clamp(min=-10, max=10))
+                state[0].register_hook(lambda x: x.clamp(min=-0.1, max=0.1))
             a = self.out_layer_coord_affine(state[0])
             # tmp_xyz = self.out_layer_coord_affine(state[0])[:, :3] + xyz
             tmp_xyz = torch.addcmul(a[:, 3:], (1 + a[:, :3]), xyz)
+            # tmp_xyz = a[:, :3] * xyz
 
             states.append(state)
             if (s+1) % (self.steps // 4) == 0:
@@ -184,13 +194,11 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.warper = Warper(latent_size, **warper_kargs)
         self.sdf_decoder = SdfDecoder(**decoder_kargs)
-        # self.sdf_decoder = SingleBVPNet(type='tanh', in_features=3, hidden_features=256, num_hidden_layers=3)
 
     def forward(self, input, output_warped_points=False, step=1.0):
         p_final, warped_xyzs = self.warper(input, step=step)
 
         if not self.training:
-            # x = self.sdf_decoder({'coords': p_final})['model_out']
             x = self.sdf_decoder(p_final)
             if output_warped_points:
                 return p_final, x
@@ -199,9 +207,6 @@ class Decoder(nn.Module):
         else:   # training mode, output intermediate positions and their corresponding sdf prediction
             xs = []
             for p in warped_xyzs:
-                # model_output_temp = self.sdf_decoder({'coords': p})
-                # sdf = model_output_temp['model_out'] # SDF value in template space
-                # xs.append(sdf)
                 xs.append(self.sdf_decoder(p))
             if output_warped_points:
                 return warped_xyzs, xs
@@ -209,5 +214,4 @@ class Decoder(nn.Module):
                 return xs
 
     def forward_template(self, input):
-        # return self.sdf_decoder({'coords': input})['model_out']
         return self.sdf_decoder(input)
