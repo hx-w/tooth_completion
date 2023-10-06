@@ -154,6 +154,8 @@ def compute_mesh_errors(tgt_mesh, ref_mesh):
     max_dist = np.max(dists)
     min_dist = np.min(dists)
 
+    print('==>', max_dist, min_dist)
+
     x_axis = np.linspace(min_dist, max_dist, 100)
     y_axis = np.zeros_like(x_axis)
 

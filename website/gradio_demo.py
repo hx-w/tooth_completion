@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-import time
+import hashlib
 
 import gradio as gr
 import plotly.express as px
@@ -11,6 +11,14 @@ from preprocess import sample_sdf_npz
 from inference import reconstruct_latent, extract_mesh_from_latent, compute_mesh_errors
 
 
+def hash_file(filename):
+    with open(filename, 'rb') as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+
+    return file_hash.hexdigest()
+
 def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(track_tqdm=True)):
     # check location model exist
     exp_model = os.path.join('experiments', f'{location[1:]}_Outside')
@@ -19,10 +27,12 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
 
     ## Preprocess
     progress(0, desc="开始采样")
-    timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
-    mesh_name = os.path.basename(mesh_path)
-    npz_name = os.path.join('.cache', f'{timestamp}_{os.path.splitext(mesh_name)[0]}.npz')
-    sample_sdf_npz(mesh_path, npz_name)
+    uuid = hash_file(mesh_path)
+    npz_name = os.path.join('.cache', f'{uuid}.npz')
+    if not os.path.isfile(npz_name):
+        sample_sdf_npz(mesh_path, npz_name)
+    else:
+        gr.Info('采样结果已缓存，跳过采样过程')
 
     ## Inference
     resols = {'低 (128x128)': 128, '中 (256x256)': 256, '高 (512x512)': 512}[resols]
@@ -31,7 +41,7 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
     gr.Info(f'符号距离场重建完成，误差为 {err:.4f}')
 
     ## Extract Mesh
-    target_mesh = os.path.join('.cache', f'{timestamp}_{os.path.splitext(mesh_name)[0]}')
+    target_mesh = os.path.join('.cache', f'{uuid}')
     progress(0, desc="开始提取网格")
     sdf_slices = extract_mesh_from_latent(decoder, latent, target_mesh, resols)
 
@@ -45,8 +55,8 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
         yaxis_title="计数",
     )
 
-    if os.path.isfile(npz_name):
-        os.remove(npz_name)
+    # if os.path.isfile(npz_name):
+    #     os.remove(npz_name)
 
     return target_mesh + '.obj', sdf_slices, fig
 
@@ -65,14 +75,15 @@ if __name__ == "__main__":
     with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
         gr.Markdown(
             '# 残缺牙齿重建\n'
-            '本项目使用神经网络重建残缺牙齿的三维模型**ToothDIT**实现。\n'
-            '从最左侧上传残缺牙齿模型，选择牙齿位置，点击开始重建即可。\n'
+            '本项目使用神经网络重建残缺牙齿的三维模型 **ToothDIT** 实现。\n'
+            '从最左侧上传残缺牙齿模型，选择牙齿位置，点击开始重建即可。\n<br/>'
+            '重建过程包括：`网格采样` -> `符号距离场重建` -> `网格提取` -> `误差分布计算`。'
         )
         with gr.Row(equal_height=True):
             with gr.Column():
                 inp_mesh = gr.Model3D(label="残缺牙齿模型")
                 inp_loc = gr.Radio(
-                    ["#11", "#12", "#13", "#14", "#21", "#22", "#23", "#24"],
+                    ["#11", "#12", "#21", "#22", "#15"],
                     value="#11",
                     label="牙齿位置",
                 )
@@ -115,4 +126,4 @@ if __name__ == "__main__":
         )
         
 
-    demo.queue().launch(share=False)
+    demo.queue().launch(share=True)
