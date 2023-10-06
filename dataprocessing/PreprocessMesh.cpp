@@ -419,7 +419,7 @@ int main(int argc, char** argv) {
     std::string npyFileName;
     std::string plyFileNameOut;
     std::string spatial_samples_npz;
-    bool save_ply = true;
+    bool save_ply = false;
     bool test_flag = false;
     float variance = 0.005;
     int num_sample = 500000;

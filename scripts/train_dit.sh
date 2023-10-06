@@ -2,7 +2,8 @@
 
 rm -rf examples/tooth_${1}/Latent* examples/tooth_${1}/*Parameters \
        examples/tooth_${1}/*Logs examples/tooth_${1}/TrainingMeshes* \
-       examples/tooth_${1}/code*
+       examples/tooth_${1}/code* \
+       examples/tooth_${1}/Recon*
 
 GPU_ID=0
 preprocessed_data_dir=./data

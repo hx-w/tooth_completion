@@ -13,6 +13,8 @@ import numpy as np
 import deep_sdf
 import deep_sdf.workspace as ws
 
+from tqdm import tqdm
+
 
 def reconstruct(
     decoder,
@@ -22,13 +24,17 @@ def reconstruct(
     stat,
     clamp_dist,
     num_samples=30000,
-    lr=5e-4,
+    lr=1e-2,
     l2reg=False,
 ):
     def adjust_learning_rate(
-        initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every
+        initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every, iter
     ):
         lr = initial_lr * ((1 / decreased_by) ** (num_iterations // adjust_lr_every))
+        # lr = initial_lr * (1 / decreased_by)
+        if iter % 100 == 0:
+            logging.info("iter: " + str(iter))
+            logging.info("lr: " + str(lr))
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
@@ -47,24 +53,24 @@ def reconstruct(
     loss_num = 0
     loss_l1 = torch.nn.L1Loss()
 
-    for e in range(num_iterations):
+    for e in tqdm(range(num_iterations), desc='iter'):
 
         decoder.eval()
         sdf_data = deep_sdf.data.unpack_sdf_samples_from_ram(
             test_sdf, num_samples
-        ).cuda()
-        xyz = sdf_data[:, 0:3]
-        sdf_gt = sdf_data[:, 3].unsqueeze(1)
+        )
+        xyz = sdf_data['coords'].cuda()
+        sdf_gt = sdf_data['sdfs'].cuda().unsqueeze(1)
 
         sdf_gt = torch.clamp(sdf_gt, -clamp_dist, clamp_dist)
 
-        adjust_learning_rate(lr, optimizer, e, decreased_by, adjust_lr_every)
+        adjust_learning_rate(lr, optimizer, e, decreased_by, adjust_lr_every, e)
 
         optimizer.zero_grad()
 
         latent_inputs = latent.expand(num_samples, -1)
 
-        inputs = torch.cat([latent_inputs, xyz], 1).cuda()
+        inputs = torch.cat([latent_inputs, xyz], 1).cuda().to(torch.float32)
 
         pred_sdf = decoder(inputs)
 
@@ -74,16 +80,16 @@ def reconstruct(
 
         pred_sdf = torch.clamp(pred_sdf, -clamp_dist, clamp_dist)
 
-        loss = loss_l1(pred_sdf, sdf_gt)
+        loss = loss_l1(pred_sdf, sdf_gt.reshape(pred_sdf.shape))
         if l2reg:
-            loss += 1e-4 * torch.mean(latent.pow(2))
+            loss += 1e-3 * torch.mean(latent.pow(2))
         loss.backward()
         optimizer.step()
 
-        if e % 50 == 0:
-            logging.debug(loss.item())
-            logging.debug(e)
-            logging.debug(latent.norm())
+        if e % 100 == 0:
+            logging.info(loss.item())
+            logging.info(e)
+            logging.info(latent.norm())
         loss_num = loss.item()
 
     return loss_num, latent
@@ -140,7 +146,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--seed",
         dest="seed",
-        default=10,
+        default=15,
         help="random seed",
     )
     arg_parser.add_argument(
@@ -300,7 +306,7 @@ if __name__ == "__main__":
                     latent_size,
                     data_sdf,
                     0.01,  # [emp_mean,emp_var],
-                    0.1,
+                    1,
                     num_samples=8000,
                     lr=5e-3,
                     l2reg=True,
@@ -324,14 +330,26 @@ if __name__ == "__main__":
             if not save_latvec_only:
                 start = time.time()
                 with torch.no_grad():
+                    deep_sdf.mesh.create_slice_heatmap(
+                        decoder,
+                        latent,
+                        mesh_filename + "_XOZ.png",
+                        22, 256, None, 0, None
+                    )
+                    deep_sdf.mesh.create_slice_heatmap(
+                        decoder,
+                        latent,
+                        mesh_filename + "_YOZ.png",
+                        22, 256, 0, None, None
+                    )
                     if args.use_octree:
                         deep_sdf.mesh.create_mesh_octree(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 17),
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 16),
                             clamp_func=clamping_function, volume_size=20
                         )
                     else:
                         deep_sdf.mesh.create_mesh(
-                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 17), volume_size=20
+                            decoder, latent, mesh_filename, N=args.resolution, max_batch=int(2 ** 16), volume_size=20
                         )
                 logging.debug("total time: {}".format(time.time() - start))
 

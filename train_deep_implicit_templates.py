@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.utils.data as data_utils
 import torch.nn
+import torch.nn.functional as F
 import signal
 import sys
 import os
@@ -60,7 +61,7 @@ def apply_pointwise_reg(warped_xyz_list, xyz_, huber_fn, num_sdf_samples):
     pw_loss = []
     for k in range(len(warped_xyz_list)):
         dist = torch.norm(warped_xyz_list[k] - xyz_, dim=-1)
-        pw_loss.append(huber_fn(dist, delta=0.25) / num_sdf_samples)
+        pw_loss.append(huber_fn(dist, delta=0.75) / num_sdf_samples)
         # pw_loss.append(torch.sum((warped_xyz_list[k] - xyz_) ** 2) / num_sdf_samples)
     pw_loss = sum(pw_loss) / len(pw_loss)
     return pw_loss
@@ -82,6 +83,11 @@ def apply_pointpair_reg(warped_xyz_list, xyz_, loss_lp, scene_per_split, num_sdf
     # ) / num_sdf_samples
     return lp_loss
 
+def gradient(y, x, grad_outputs=None):
+    if grad_outputs is None:
+        grad_outputs = torch.ones_like(y)
+    grad = torch.autograd.grad(y, [x], grad_outputs=grad_outputs, create_graph=True)[0]
+    return grad
 
 def main_function(experiment_directory, data_source, continue_from, batch_split):
 
@@ -172,7 +178,10 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
 
     code_bound = get_spec_with_default(specs, "CodeBound", None)
 
-    decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
+    if specs["NetworkArch"] == "deep_sdf_decoder":
+        decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]["decoder_kargs"]).cuda()
+    else:
+        decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
 
     logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
 
@@ -245,8 +254,6 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             },
         ]
     )
-
-    tensorboard_saver = ws.create_tensorboard_saver(experiment_directory)
 
     loss_log = []
     lr_log = []
@@ -331,27 +338,31 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
         batch_num = len(sdf_loader)
-        for bi, (sdf_data, indices) in enumerate(sdf_loader):
+        for bi, (datas, indices) in enumerate(sdf_loader):
             # Process the input data
-            sdf_data = sdf_data.reshape(-1, 4)
+            coords = datas['coords'].reshape((-1, 3))
+            # normals = datas['normals'].reshape((-1, 3))
+            sdfs = datas['sdfs'].reshape((-1, 1)).unsqueeze(1)
+            num_sdf_samples = coords.shape[0]
 
-            num_sdf_samples = sdf_data.shape[0]
+            # sdf_data.requires_grad = False
+            sdfs.requires_grad = False
+            coords.requires_grad = False
 
-            sdf_data.requires_grad = False
-
-            xyz = sdf_data[:, 0:3]
-            sdf_gt = sdf_data[:, 3].unsqueeze(1)
+            # xyz = sdf_data[:, 0:3]
+            # sdf_gt = sdf_data[:, 3].unsqueeze(1)
 
             if enforce_minmax:
-                sdf_gt = torch.clamp(sdf_gt, minT, maxT)
+                sdfs = torch.clamp(sdfs, minT, maxT)
 
-            xyz = torch.chunk(xyz, batch_split)
+            coords = torch.chunk(coords, batch_split)
+            sdfs = torch.chunk(sdfs, batch_split)
+            # normals = torch.chunk(normals, batch_split)
+
             indices = torch.chunk(
                 indices.unsqueeze(-1).repeat(1, num_samp_per_scene).view(-1),
                 batch_split,
             )
-
-            sdf_gt = torch.chunk(sdf_gt, batch_split)
 
             batch_loss_sdf = 0.0
             batch_loss_pw = 0.0
@@ -364,13 +375,12 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             for i in range(batch_split):
 
                 batch_vecs = lat_vecs(indices[i])
-
-                input = torch.cat([batch_vecs, xyz[i]], dim=1)
-                xyz_ = xyz[i].cuda()
+                input = torch.cat([batch_vecs, coords[i]], dim=1).to(torch.float32)
+                xyz_ = coords[i].cuda()
 
                 # NN optimization
-                warped_xyz_list, pred_sdf_list, _ = decoder(
-                    input, output_warped_points=True, output_warping_param=True)
+                warped_xyz_list, pred_sdf_list = decoder(
+                    input, output_warped_points=True)
 
                 if enforce_minmax:
                     # pred_sdf = pred_sdf * clamp_dist * 1.0
@@ -379,9 +389,9 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
 
                 if use_curriculum:
                     sdf_loss = apply_curriculum_l1_loss(
-                        pred_sdf_list, sdf_gt[i].cuda(), loss_l1_soft, num_sdf_samples)
+                        pred_sdf_list, sdfs[i].cuda(), loss_l1_soft, num_sdf_samples)
                 else:
-                    sdf_loss = loss_l1(pred_sdf_list[-1], sdf_gt[i].cuda()) / num_sdf_samples
+                    sdf_loss = loss_l1(pred_sdf_list[-1], sdfs[i].cuda()) / num_sdf_samples
                 batch_loss_sdf += sdf_loss.item()
                 chunk_loss = sdf_loss
 
@@ -399,6 +409,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                     batch_loss_pw += pw_loss.item()
                     chunk_loss = chunk_loss + pw_loss.cuda() * pointwise_loss_weight * max(1.0, 10.0 * (1 - epoch / 100))
 
+                    del pw_loss
+
                 if use_pointpair_loss:
                     if use_curriculum:
                         lp_loss = apply_pointpair_reg(warped_xyz_list, xyz_, loss_lp, scene_per_split, num_sdf_samples)
@@ -407,16 +419,10 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
                     batch_loss_pp += lp_loss.item()
                     chunk_loss += lp_loss.cuda() * pointpair_loss_weight * min(1.0, epoch / 100)
 
+                    del lp_loss
+                
                 chunk_loss.backward()
                 batch_loss += chunk_loss.item()
-
-            # logging.debug("sdf_loss = {:.9f}, reg_loss = {:.9f}, pw_loss = {:.9f}, pp_loss = {:.9f}".format(
-            #     batch_loss_sdf, batch_loss_reg, batch_loss_pw, batch_loss_pp))
-
-            ws.save_tensorboard_logs(
-                tensorboard_saver, epoch*batch_num + bi,
-                loss_sdf=batch_loss_sdf, loss_pw=batch_loss_pw, loss_reg=batch_loss_reg,
-                loss_pp=batch_loss_pp, loss_=batch_loss)
 
             if epoch % 20 == 0:
                 logging.debug('batch_loss = {:.9f}'.format(batch_loss))
@@ -430,8 +436,8 @@ def main_function(experiment_directory, data_source, continue_from, batch_split)
             optimizer_all.step()
 
             # release memory
-            del warped_xyz_list, pred_sdf_list, sdf_loss, pw_loss, \
-                lp_loss, batch_loss_sdf, batch_loss_reg, batch_loss_pp, batch_loss_pw, batch_loss, chunk_loss
+            del warped_xyz_list, pred_sdf_list, sdf_loss, \
+                batch_loss_sdf, batch_loss_reg, batch_loss_pp, batch_loss_pw, batch_loss, chunk_loss
 
         end = time.time()
 
@@ -468,7 +474,7 @@ if __name__ == "__main__":
 
     import argparse
 
-    arg_parser = argparse.ArgumentParser(description="Train a DeepSDF autodecoder")
+    arg_parser = argparse.ArgumentParser(description="Train a ToothDIT autodecoder")
     arg_parser.add_argument(
         "--experiment",
         "-e",
@@ -496,7 +502,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--batch_split",
         dest="batch_split",
-        default=1,
+        default=4,
         help="This splits the batch into separate subbatches which are "
         + "processed separately, with gradients accumulated across all "
         + "subbatches. This allows for training with large effective batch "

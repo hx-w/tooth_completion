@@ -4,3 +4,6 @@
 [submodule "cnpy"]
 	path = cnpy
 	url = https://github.com/rogersce/cnpy.git
+[submodule "mesh_to_sdf"]
+	path = mesh_to_sdf
+	url = https://github.com/marian42/mesh_to_sdf.git
