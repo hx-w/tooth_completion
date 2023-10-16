@@ -24,6 +24,8 @@ def sample_sdf_npz(mesh_path: str, target_path: str):
             sphere_size=11.0,
         )
 
+        # print('==> sample finished', pnts.shape, sdfs.shape)
+
         datas = np.concatenate([pnts, sdfs.reshape(-1, 1)], axis=1)
         reserved_ = datas[datas[:, 2] < 0.0]
         clipped_ = datas[datas[:, 2] >= 0.0]

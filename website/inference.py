@@ -19,7 +19,7 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-def reconstruct_latent(npz_name, iters, exp_model):
+def reconstruct_latent(npz_name, iters, exp_model, skip=False):
     random.seed(31359)
     torch.random.manual_seed(31359)
     np.random.seed(31359)
@@ -40,7 +40,8 @@ def reconstruct_latent(npz_name, iters, exp_model):
     decoder.load_state_dict(saved_model_state["model_state_dict"])
     decoder = decoder.module.cuda()
 
-    clamping_function = lambda x : torch.clamp(x, -specs["ClampingDistance"], specs["ClampingDistance"])
+    if skip:
+        return 0.0, None, decoder
 
     data_sdf = deep_sdf.data.read_sdf_samples_into_ram(npz_name)
 
@@ -130,6 +131,12 @@ def extract_mesh_from_latent(decoder, latent, mesh_path, resols):
         res.remove_infinite_values()
         res.remove_duplicate_faces()
         res.vertex_normals
+
+        ## temp fix mesh scale issue
+        scale_trans = np.eye(4)
+        scale_trans[:3, :3] *= 0.94
+        res.apply_transform(scale_trans)
+
         res.export(mesh_path + '.obj', include_normals=True)
 
         os.remove(mesh_path + '.ply')

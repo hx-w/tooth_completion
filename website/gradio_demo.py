@@ -6,16 +6,19 @@ import hashlib
 import gradio as gr
 import plotly.express as px
 import pandas as pd
+import torch
 
 from preprocess import sample_sdf_npz
 from inference import reconstruct_latent, extract_mesh_from_latent, compute_mesh_errors
 
 
-def hash_file(filename):
+def hash_file(filename, params=()):
     with open(filename, 'rb') as f:
         file_hash = hashlib.md5()
         while chunk := f.read(8192):
             file_hash.update(chunk)
+
+    file_hash.update(repr(params).encode('utf-8'))
 
     return file_hash.hexdigest()
 
@@ -29,21 +32,35 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
     progress(0, desc="开始采样")
     uuid = hash_file(mesh_path)
     npz_name = os.path.join('.cache', f'{uuid}.npz')
-    if not os.path.isfile(npz_name):
-        sample_sdf_npz(mesh_path, npz_name)
-    else:
+    
+    if os.path.isfile(npz_name):
         gr.Info('采样结果已缓存，跳过采样过程')
+    else:
+        sample_sdf_npz(mesh_path, npz_name)
 
     ## Inference
-    resols = {'低 (128x128)': 128, '中 (256x256)': 256, '高 (512x512)': 512}[resols]
     progress(0, desc="开始重建符号距离场")
-    err, latent, decoder = reconstruct_latent(npz_name, iters, exp_model)
-    gr.Info(f'符号距离场重建完成，误差为 {err:.4f}')
+    latent_file_name = os.path.join('.cache', f'{uuid}-{iters}.pth')
+
+    if os.path.isfile(latent_file_name):
+        latent = torch.load(latent_file_name)['latent_code'].cuda()
+        err, _, decoder = reconstruct_latent(npz_name, iters, exp_model, skip=True)
+        gr.Info('符号距离场已缓存，跳过重建过程')
+    else:
+        err, latent, decoder = reconstruct_latent(npz_name, iters, exp_model, skip=False)
+        torch.save({'latent_code': latent}, latent_file_name)
+        gr.Info(f'符号距离场重建完成，误差为 {err:.4f}')
 
     ## Extract Mesh
-    target_mesh = os.path.join('.cache', f'{uuid}')
     progress(0, desc="开始提取网格")
-    sdf_slices = extract_mesh_from_latent(decoder, latent, target_mesh, resols)
+    resols = {'低 (128x128)': 128, '中 (256x256)': 256, '高 (512x512)': 512}[resols]
+    target_mesh = os.path.join('.cache', f'{uuid}-{iters}-{resols}')
+
+    if os.path.isfile(target_mesh):
+        sdf_slices = [target_mesh + '_XOZ.png', target_mesh + '_YOZ.png', target_mesh + '_XOY.png']
+        gr.Info(f'网格提取结果已缓存，跳过提取过程')
+    else:
+        sdf_slices = extract_mesh_from_latent(decoder, latent, target_mesh, resols)
 
     progress(0, desc="开始计算误差分布")
     x_axis, y_axis = compute_mesh_errors(target_mesh + '.obj', mesh_path)
@@ -124,6 +141,13 @@ if __name__ == "__main__":
             inputs=[inp_mesh, inp_loc, inp_iters, inp_resols],
             outputs=[otp_mesh, otp_slices, otp_errors, trd_col]
         )
+
+        gr.Markdown(
+            '## Changelogs\n'
+            '### 2023-10-16\n'
+            '- 解决修复的网格尺寸略大的问题\n'
+            '- 优化cache命中策略\n'
+        )
         
 
-    demo.queue().launch(share=True)
+    demo.queue().launch(share=False, server_name="0.0.0.0", server_port=8000)
