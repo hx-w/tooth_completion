@@ -56,7 +56,7 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
     resols = {'低 (128x128)': 128, '中 (256x256)': 256, '高 (512x512)': 512}[resols]
     target_mesh = os.path.join('.cache', f'{uuid}-{iters}-{resols}')
 
-    if os.path.isfile(target_mesh):
+    if os.path.isfile(target_mesh + '.obj'):
         sdf_slices = [target_mesh + '_XOZ.png', target_mesh + '_YOZ.png', target_mesh + '_XOY.png']
         gr.Info(f'网格提取结果已缓存，跳过提取过程')
     else:
@@ -71,9 +71,6 @@ def entry_defect_mesh(mesh_path, location, iters, resols, progress=gr.Progress(t
         xaxis_title="误差区间",
         yaxis_title="计数",
     )
-
-    # if os.path.isfile(npz_name):
-    #     os.remove(npz_name)
 
     return target_mesh + '.obj', sdf_slices, fig
 

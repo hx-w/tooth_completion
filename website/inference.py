@@ -41,6 +41,7 @@ def reconstruct_latent(npz_name, iters, exp_model, skip=False):
     decoder = decoder.module.cuda()
 
     if skip:
+        decoder.eval()
         return 0.0, None, decoder
 
     data_sdf = deep_sdf.data.read_sdf_samples_into_ram(npz_name)
